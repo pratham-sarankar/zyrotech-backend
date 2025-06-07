@@ -25,12 +25,6 @@ const transporter = nodemailer.createTransport({
  */
 export const verifySMTPConnection = async (): Promise<void> => {
   try {
-     console.error('Current SMTP configuration:', {
-      host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT,
-      secure: process.env.SMTP_SECURE,
-      user: process.env.SMTP_USER,
-    });
     await transporter.verify();
     console.log('SMTP server connection established and ready to send emails.');
   } catch (error) {
