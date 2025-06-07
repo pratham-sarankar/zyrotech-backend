@@ -32,15 +32,15 @@ export class AppError extends Error {
  * Global error handling middleware
  * Handles both operational and programming errors
  * @param {Error | AppError} err - Error object
- * @param {Request} req - Express request object
+ * @param {Request} _req - Express request object
  * @param {Response} res - Express response object
- * @param {NextFunction} next - Express next middleware function
+ * @param {NextFunction} _next - Express next middleware function
  */
 export const errorHandler = (
   err: Error | AppError,
-  req: Request,
+  _req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ) => {
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({

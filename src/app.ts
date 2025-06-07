@@ -26,7 +26,7 @@ app.use(express.urlencoded({ extended: true })); // Parse URL-encoded request bo
 app.use('/api/auth', authRoutes); // Mount authentication routes
 
 // Health check endpoint
-app.get('/', (req: Request, res: Response) => {
+app.get('/', (_req: Request, res: Response) => {
   res.json({ message: 'Welcome to Express + TypeScript API' });
 });
 

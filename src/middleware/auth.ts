@@ -64,6 +64,7 @@ export const requireEmailVerification = async (req: Request, res: Response, next
     return res.status(403).json({ error: 'Your email is not verified yet.' });
   }
   next();
+  return;
 };
 
 /**
@@ -77,4 +78,5 @@ export const requirePhoneVerification = async (req: Request, res: Response, next
     return res.status(403).json({ error: 'Your phone number is not verified yet.' });
   }
   next();
+  return;
 }; 

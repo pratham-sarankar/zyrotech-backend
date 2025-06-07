@@ -1,7 +1,7 @@
 {
   "name": "zyrotech_backend",
   "version": "1.0.0",
-  "description": "Express.js application with TypeScript",
+  "description": "Backend API for Zyrotech",
   "main": "dist/app.js",
   "scripts": {
     "start": "node dist/app.js",

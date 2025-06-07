@@ -10,7 +10,6 @@ import { createOTP, verifyOTP, checkOTPCooldown } from '../utils/otpUtils';
 import { sendVerificationEmail } from '../utils/emailUtils';
 
 // JWT configuration
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const JWT_EXPIRES_IN = '7d';
 
 /**
