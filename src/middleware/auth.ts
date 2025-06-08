@@ -10,7 +10,7 @@ import User from '../models/User';
  * JWT payload interface
  */
 interface JwtPayload {
-  userId: string;
+  id: string;
 }
 
 /**
@@ -40,7 +40,7 @@ export const auth = async (req: Request, res: Response, next: NextFunction) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as JwtPayload;
-    const user = await User.findById(decoded.userId);
+    const user = await User.findById(decoded.id);
 
     if (!user) {
       throw new Error();

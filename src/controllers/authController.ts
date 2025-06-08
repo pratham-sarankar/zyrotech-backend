@@ -20,7 +20,7 @@ const JWT_EXPIRES_IN = '7d';
  * @param {NextFunction} next - Express next middleware function
  * @returns {Promise<void>}
  */
-export const signup = async (req: Request, res: Response, next: NextFunction) => {
+export const signup = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { fullName, email, password } = req.body;
 
@@ -59,7 +59,7 @@ export const signup = async (req: Request, res: Response, next: NextFunction) =>
  * @param {NextFunction} next - Express next middleware function
  * @returns {Promise<void>}
  */
-export const sendEmailOTP = async (req: Request, res: Response, next: NextFunction) => {
+export const sendEmailOTP = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { email } = req.body;
 
@@ -103,7 +103,7 @@ export const sendEmailOTP = async (req: Request, res: Response, next: NextFuncti
  * @param {NextFunction} next - Express next middleware function
  * @returns {Promise<void>}
  */
-export const verifyEmailOTP = async (req: Request, res: Response, next: NextFunction) => {
+export const verifyEmailOTP = async (req: Request, res: Response, next: NextFunction): Promise<void>=> {
   try {
     const { email, otp } = req.body;
 
@@ -125,80 +125,6 @@ export const verifyEmailOTP = async (req: Request, res: Response, next: NextFunc
 };
 
 /**
- * Send phone verification OTP
- * @route POST /api/auth/send-phone-otp
- * @param {Request} req - Express request object
- * @param {Response} res - Express response object
- * @param {NextFunction} next - Express next middleware function
- * @returns {Promise<void>}
- */
-export const sendPhoneOTP = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { phoneNumber } = req.body;
-
-    // Validate required field
-    if (!phoneNumber) {
-      throw new AppError('Phone number is required', 400);
-    }
-
-    // Check if user exists with this phone number
-    const user = await User.findOne({ phoneNumber });
-    if (!user) {
-      throw new AppError('No user found with this phone number', 404);
-    }
-
-    // Check if phone number is already verified
-    if (user.isPhoneVerified) {
-      throw new AppError('Phone number is already verified', 400);
-    }
-
-    // Check cooldown period
-    const isInCooldown = await checkOTPCooldown(phoneNumber, 'phone');
-    if (isInCooldown) {
-      throw new AppError('Please wait before requesting another OTP', 429);
-    }
-
-    // Generate and send OTP
-    const otpRecord = await createOTP(phoneNumber, 'phone');
-    // TODO: Implement SMS sending functionality
-    console.log(`Phone OTP for ${phoneNumber}: ${otpRecord.otp}`);
-
-    res.json({ message: 'OTP sent successfully' });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Verify phone OTP
- * @route POST /api/auth/verify-phone-otp
- * @param {Request} req - Express request object
- * @param {Response} res - Express response object
- * @param {NextFunction} next - Express next middleware function
- * @returns {Promise<void>}
- */
-export const verifyPhoneOTP = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { phoneNumber, otp } = req.body;
-
-    const isValid = await verifyOTP(phoneNumber, otp, 'phone');
-    if (!isValid) {
-      throw new AppError('Invalid or expired OTP', 400);
-    }
-
-    // Update user verification status
-    await User.findOneAndUpdate(
-      { phone: phoneNumber },
-      { isPhoneVerified: true }
-    );
-
-    res.json({ message: 'Phone number verified successfully' });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
  * Login user
  * @route POST /api/auth/login
  * @param {Request} req - Express request object
@@ -206,7 +132,7 @@ export const verifyPhoneOTP = async (req: Request, res: Response, next: NextFunc
  * @param {NextFunction} next - Express next middleware function
  * @returns {Promise<void>}
  */
-export const login = async (req: Request, res: Response, next: NextFunction) => {
+export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { email, password } = req.body;
 
@@ -224,11 +150,6 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     // Check email verification
     if (!user.isEmailVerified) {
       throw new AppError('Please verify your email before logging in', 403);
-    }
-
-    // Check phone verification only if phone number exists
-    if (user.phoneNumber && !user.isPhoneVerified) {
-      throw new AppError('Please verify your phone number before logging in', 403);
     }
 
     // Generate JWT token
