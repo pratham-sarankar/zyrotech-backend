@@ -4,6 +4,7 @@
  */
 import 'dotenv/config';
 import express, { Request, Response } from 'express';
+import cors from 'cors';
 import connectDB from './config/database';
 import authRoutes from './routes/auth';
 import profileRoutes from './routes/profile';
@@ -19,7 +20,8 @@ connectDB();
 // Verify SMTP connection
 verifySMTPConnection();
 
-// Global middleware
+// Middleware
+app.use(cors()); // Enable CORS for all origins
 app.use(express.json()); // Parse JSON request bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded request bodies
 
