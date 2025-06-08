@@ -4,6 +4,7 @@ import {
   verifyPhoneOTP,
   setPin,
   verifyPin,
+  updatePassword,
 } from "../controllers/profileController";
 import { auth } from "../middleware/auth";
 import { getMe } from "../controllers/authController";
@@ -17,11 +18,14 @@ router.get("/me", auth, getMe);
 router.use(auth);
 
 // Phone verification routes
-router.put("/phone", updatePhoneAndSendOTP);
-router.post("/phone/verify", verifyPhoneOTP);
+router.post("/phone", updatePhoneAndSendOTP);
+router.post("/verify-phone", verifyPhoneOTP);
 
 // PIN routes
 router.post("/pin", setPin);
 router.post("/verify-pin", verifyPin);
+
+// Password update route
+router.put("/password", updatePassword);
 
 export default router;
