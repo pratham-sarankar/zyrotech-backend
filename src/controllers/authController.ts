@@ -131,10 +131,6 @@ export const verifyEmailOTP = async (req: Request, res: Response, next: NextFunc
 /**
  * Login user
  * @route POST /api/auth/login
- * @param {Request} req - Express request object
- * @param {Response} res - Express response object
- * @param {NextFunction} next - Express next middleware function
- * @returns {Promise<void>}
  */
 export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -145,9 +141,19 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
       throw new AppError('Please provide email and password', 400);
     }
 
-    // Find user and check password
+    // Find user and check if they exist
     const user = await User.findOne({ email }).select('+password');
-    if (!user || !(await user.comparePassword(password))) {
+    if (!user) {
+      throw new AppError('Invalid email or password', 401);
+    }
+
+    // Check if user is Google-authenticated
+    if (user.googleId && !user.password) {
+      throw new AppError('This account was created using Google. Please sign in with Google.', 401);
+    }
+
+    // Check password
+    if (!(await user.comparePassword(password))) {
       throw new AppError('Invalid email or password', 401);
     }
 
