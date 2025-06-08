@@ -4,6 +4,7 @@
  */
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
 import User from '../models/User';
 import { AppError } from '../middleware/errorHandler';
 import { createOTP, verifyOTP, checkOTPCooldown } from '../utils/otpUtils';
@@ -11,6 +12,9 @@ import { sendVerificationEmail } from '../utils/emailUtils';
 
 // JWT configuration
 const JWT_EXPIRES_IN = '7d';
+
+// Google OAuth client
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 /**
  * Register a new user
@@ -173,5 +177,93 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
     });
   } catch (error) {
     next(error);
+  }
+};
+
+/**
+ * Google OAuth authentication
+ * @route POST /api/auth/google
+ */
+export const googleAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      throw new AppError('ID token is required', 400);
+    }
+
+    // Verify the Google ID token
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload) {
+      throw new AppError('Invalid ID token', 401);
+    }
+
+    const {
+      email,
+      name,
+      picture,
+      sub: googleId
+    } = payload;
+
+    if (!email) {
+      throw new AppError('Email is required from Google profile', 400);
+    }
+
+    // Find or create user
+    let user = await User.findOne({
+      $or: [
+        { email },
+        { googleId }
+      ]
+    });
+
+    if (user) {
+      // Update user's Google profile if needed
+      if (!user.googleId || user.googleId !== googleId) {
+        user.googleId = googleId;
+        user.fullName = name || user.fullName;
+        user.profilePicture = picture || user.profilePicture;
+        await user.save();
+      }
+    } else {
+      // Create new user
+      user = await User.create({
+        email,
+        fullName: name || email.split('@')[0],
+        googleId,
+        profilePicture: picture,
+        isEmailVerified: true // Google emails are pre-verified
+      });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: JWT_EXPIRES_IN }
+    );
+
+    res.json({
+      message: 'Google authentication successful',
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        fullName: user.fullName,
+        profilePicture: user.profilePicture,
+        isEmailVerified: user.isEmailVerified
+      }
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('Invalid token')) {
+      next(new AppError('Invalid Google ID token', 401));
+    } else {
+      next(error);
+    }
   }
 }; 

@@ -12,7 +12,9 @@ export interface IUser extends Document {
   fullName: string;
   email: string;
   phoneNumber?: string; // Optional phone number
-  password: string;
+  password?: string;
+  googleId?: string;
+  profilePicture?: string;
   isEmailVerified: boolean;
   isPhoneVerified: boolean;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -47,9 +49,17 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: [true, 'Please provide a password'],
     minlength: [8, 'Password must be at least 8 characters long'],
     select: false // Don't include password in query results by default
+  },
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  profilePicture: {
+    type: String,
+    trim: true
   },
   isEmailVerified: {
     type: Boolean,
@@ -67,8 +77,8 @@ const userSchema = new mongoose.Schema({
  * Hash password before saving
  */
 userSchema.pre('save', async function(next) {
-  // Only hash the password if it's modified (or new)
-  if (!this.isModified('password')) return next();
+  // Only hash the password if it's modified (or new) and exists
+  if (!this.isModified('password') || !this.password) return next();
 
   try {
     // Generate salt
