@@ -15,9 +15,13 @@ export interface IUser extends Document {
   password?: string;
   googleId?: string;
   profilePicture?: string;
+  hashedPin?: string;
+  resetPasswordToken?: string;
+  resetPasswordExpires?: Date;
   isEmailVerified: boolean;
   isPhoneVerified: boolean;
   comparePassword(candidatePassword: string): Promise<boolean>;
+  comparePin(candidatePin: string): Promise<boolean>;
 }
 
 /**
@@ -61,6 +65,18 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  hashedPin: {
+    type: String,
+    select: false
+  },
+  resetPasswordToken: {
+    type: String,
+    select: false
+  },
+  resetPasswordExpires: {
+    type: Date,
+    select: false
+  },
   isEmailVerified: {
     type: Boolean,
     default: false
@@ -99,6 +115,20 @@ userSchema.pre('save', async function(next) {
 userSchema.methods.comparePassword = async function(candidatePassword: string): Promise<boolean> {
   try {
     return await bcrypt.compare(candidatePassword, this.password);
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Compare PIN with hashed PIN
+ * @param {string} candidatePin - PIN to compare
+ * @returns {Promise<boolean>} True if PINs match
+ */
+userSchema.methods.comparePin = async function(candidatePin: string): Promise<boolean> {
+  try {
+    if (!this.hashedPin) return false;
+    return await bcrypt.compare(candidatePin, this.hashedPin);
   } catch (error) {
     throw error;
   }

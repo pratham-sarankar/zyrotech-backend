@@ -2,16 +2,18 @@
  * Authentication Controller
  * Handles user authentication, registration, and verification
  */
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import { OAuth2Client } from 'google-auth-library';
-import User from '../models/User';
-import { AppError } from '../middleware/errorHandler';
-import { createOTP, verifyOTP, checkOTPCooldown } from '../utils/otpUtils';
-import { sendVerificationEmail } from '../utils/emailUtils';
+import { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
+import { OAuth2Client } from "google-auth-library";
+import crypto from "crypto";
+import path from "path";
+import User from "../models/User";
+import { AppError } from "../middleware/errorHandler";
+import { createOTP, verifyOTP, checkOTPCooldown } from "../utils/otpUtils";
+import { sendVerificationEmail } from "../utils/emailUtils";
 
 // JWT configuration
-const JWT_EXPIRES_IN = '7d';
+const JWT_EXPIRES_IN = "7d";
 
 // Google OAuth client
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -24,31 +26,35 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
  * @param {NextFunction} next - Express next middleware function
  * @returns {Promise<void>}
  */
-export const signup = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const signup = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
   try {
     const { fullName, email, password } = req.body;
 
     // Validate required fields
     if (!fullName || !email || !password) {
-      throw new AppError('Please provide all required fields', 400);
+      throw new AppError("Please provide all required fields", 400);
     }
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      throw new AppError('User already exists', 409);
+      throw new AppError("User already exists", 409);
     }
 
     // Create new user
     const user = await User.create({
       fullName,
       email,
-      password
+      password,
     });
 
     res.status(201).json({
-      message: 'Account created. Please verify your email.',
-      userId: user._id
+      message: "Account created. Please verify your email.",
+      userId: user._id,
     });
   } catch (error) {
     next(error);
@@ -63,37 +69,41 @@ export const signup = async (req: Request, res: Response, next: NextFunction): P
  * @param {NextFunction} next - Express next middleware function
  * @returns {Promise<void>}
  */
-export const sendEmailOTP = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const sendEmailOTP = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
   try {
     const { email } = req.body;
 
     // Validate required field
     if (!email) {
-      throw new AppError('Email is required', 400);
+      throw new AppError("Email is required", 400);
     }
 
     // Check if user exists
     const user = await User.findOne({ email });
     if (!user) {
-      throw new AppError('User not found. Please sign up first.', 404);
+      throw new AppError("User not found. Please sign up first.", 404);
     }
 
     // Check if email is already verified
     if (user.isEmailVerified) {
-      throw new AppError('Email is already verified', 400);
+      throw new AppError("Email is already verified", 400);
     }
 
     // Check cooldown period
-    const isInCooldown = await checkOTPCooldown(email, 'email');
+    const isInCooldown = await checkOTPCooldown(email, "email");
     if (isInCooldown) {
-      throw new AppError('Please wait before requesting another OTP', 429);
+      throw new AppError("Please wait before requesting another OTP", 429);
     }
 
     // Generate and send OTP
-    const otpRecord = await createOTP(email, 'email');
-    await sendVerificationEmail(email, otpRecord.otp);
+    const otpRecord = await createOTP(email, "email");
+    await sendVerificationEmail(email, otpRecord.otp, "verification");
 
-    res.json({ message: 'OTP sent successfully' });
+    res.json({ message: "OTP sent successfully" });
   } catch (error) {
     next(error);
   }
@@ -107,22 +117,23 @@ export const sendEmailOTP = async (req: Request, res: Response, next: NextFuncti
  * @param {NextFunction} next - Express next middleware function
  * @returns {Promise<void>}
  */
-export const verifyEmailOTP = async (req: Request, res: Response, next: NextFunction): Promise<void>=> {
+export const verifyEmailOTP = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
   try {
     const { email, otp } = req.body;
 
-    const isValid = await verifyOTP(email, otp, 'email');
+    const isValid = await verifyOTP(email, otp, "email");
     if (!isValid) {
-      throw new AppError('Invalid or expired OTP', 400);
+      throw new AppError("Invalid or expired OTP", 400);
     }
 
     // Update user verification status
-    await User.findOneAndUpdate(
-      { email },
-      { isEmailVerified: true }
-    );
+    await User.findOneAndUpdate({ email }, { isEmailVerified: true });
 
-    res.json({ message: 'Email verified successfully' });
+    res.json({ message: "Email verified successfully" });
   } catch (error) {
     next(error);
   }
@@ -132,45 +143,52 @@ export const verifyEmailOTP = async (req: Request, res: Response, next: NextFunc
  * Login user
  * @route POST /api/auth/login
  */
-export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const login = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
   try {
     const { email, password } = req.body;
 
     // Validate required fields
     if (!email || !password) {
-      throw new AppError('Please provide email and password', 400);
+      throw new AppError("Please provide email and password", 400);
     }
 
     // Find user and check if they exist
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ email }).select("+password");
     if (!user) {
-      throw new AppError('Invalid email or password', 401);
+      throw new AppError("Invalid email or password", 401);
     }
 
     // Check if user is Google-authenticated
     if (user.googleId && !user.password) {
-      throw new AppError('This account was created using Google. Please sign in with Google.', 401);
+      throw new AppError(
+        "This account was created using Google. Please sign in with Google.",
+        401
+      );
     }
 
     // Check password
     if (!(await user.comparePassword(password))) {
-      throw new AppError('Invalid email or password', 401);
+      throw new AppError("Invalid email or password", 401);
     }
 
     // Check email verification
     if (!user.isEmailVerified) {
-      throw new AppError('Please verify your email before logging in', 403);
+      throw new AppError("Please verify your email before logging in", 403);
     }
 
     // Generate JWT token
     const token = jwt.sign(
       { id: user._id },
-      process.env.JWT_SECRET || 'your-secret-key',
+      process.env.JWT_SECRET || "your-secret-key",
       { expiresIn: JWT_EXPIRES_IN }
     );
 
     res.json({
-      message: 'Login successful',
+      message: "Login successful",
       token,
       user: {
         id: user._id,
@@ -178,8 +196,8 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
         email: user.email,
         phoneNumber: user.phoneNumber,
         isEmailVerified: user.isEmailVerified,
-        ...(user.phoneNumber && { isPhoneVerified: user.isPhoneVerified })
-      }
+        ...(user.phoneNumber && { isPhoneVerified: user.isPhoneVerified }),
+      },
     });
   } catch (error) {
     next(error);
@@ -190,48 +208,46 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
  * Google OAuth authentication
  * @route POST /api/auth/google
  */
-export const googleAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const googleAuth = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
   try {
     const { idToken } = req.body;
 
     if (!idToken) {
-      throw new AppError('ID token is required', 400);
+      throw new AppError("ID token is required", 400);
     }
 
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_IOS_CLIENT_ID) {
-      throw new AppError('Google Client IDs are not configured', 500);
+      throw new AppError("Google Client IDs are not configured", 500);
     }
 
     // Verify the Google ID token
     try {
       const ticket = await googleClient.verifyIdToken({
         idToken,
-        audience: [process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_IOS_CLIENT_ID]
+        audience: [
+          process.env.GOOGLE_CLIENT_ID,
+          process.env.GOOGLE_IOS_CLIENT_ID,
+        ],
       });
 
       const payload = ticket.getPayload();
       if (!payload) {
-        throw new AppError('Invalid ID token', 401);
+        throw new AppError("Invalid ID token", 401);
       }
 
-
-      const {
-        email,
-        name,
-        picture,
-        sub: googleId
-      } = payload;
+      const { email, name, picture, sub: googleId } = payload;
 
       if (!email) {
-        throw new AppError('Email is required from Google profile', 400);
+        throw new AppError("Email is required from Google profile", 400);
       }
 
       // Find or create user
       let user = await User.findOne({
-        $or: [
-          { email },
-          { googleId }
-        ]
+        $or: [{ email }, { googleId }],
       });
 
       if (user) {
@@ -246,22 +262,22 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
         // Create new user
         user = await User.create({
           email,
-          fullName: name || email.split('@')[0],
+          fullName: name || email.split("@")[0],
           googleId,
           profilePicture: picture,
-          isEmailVerified: true // Google emails are pre-verified
+          isEmailVerified: true, // Google emails are pre-verified
         });
       }
 
       // Generate JWT token
       const token = jwt.sign(
         { id: user._id },
-        process.env.JWT_SECRET || 'your-secret-key',
+        process.env.JWT_SECRET || "your-secret-key",
         { expiresIn: JWT_EXPIRES_IN }
       );
 
       res.json({
-        message: 'Google authentication successful',
+        message: "Google authentication successful",
         token,
         user: {
           id: user._id,
@@ -269,18 +285,18 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
           fullName: user.fullName,
           profilePicture: user.profilePicture,
           isEmailVerified: user.isEmailVerified,
-        }
+        },
       });
     } catch (error) {
       if (error instanceof Error) {
-        if (error.message.includes('Wrong recipient')) {
-          throw new AppError('Invalid Google Client ID configuration', 500);
+        if (error.message.includes("Wrong recipient")) {
+          throw new AppError("Invalid Google Client ID configuration", 500);
         }
-        if (error.message.includes('Token used too late')) {
-          throw new AppError('Google token has expired', 401);
+        if (error.message.includes("Token used too late")) {
+          throw new AppError("Google token has expired", 401);
         }
-        if (error.message.includes('Invalid token')) {
-          throw new AppError('Invalid Google ID token', 401);
+        if (error.message.includes("Invalid token")) {
+          throw new AppError("Invalid Google ID token", 401);
         }
       }
       throw error;
@@ -288,4 +304,159 @@ export const googleAuth = async (req: Request, res: Response, next: NextFunction
   } catch (error) {
     next(error);
   }
-}; 
+};
+
+/**
+ * Serve reset password page
+ * @route GET /reset-password
+ */
+export const getResetPasswordPage = async (
+  _req: Request,
+  res: Response
+): Promise<void> => {
+  res.sendFile(path.join(__dirname, "../views/reset-password.html"));
+};
+
+/**
+ * Forgot password
+ * @route POST /api/auth/forgot-password
+ */
+export const forgotPassword = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      throw new AppError("Email is required", 400);
+    }
+
+    // Find user and select reset password fields
+    const user = await User.findOne({ email }).select(
+      "+resetPasswordToken +resetPasswordExpires"
+    );
+    if (!user) {
+      // Don't reveal if email exists
+      res.json({
+        message:
+          "If an account with that email exists, a reset link has been sent.",
+      });
+      return;
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
+
+    // Set token and expiration
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpires = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+    await user.save();
+
+    // Send reset email with the reset page URL
+    const resetUrl = `${req.protocol}://${req.get(
+      "host"
+    )}/reset-password?token=${resetToken}`;
+    await sendVerificationEmail(email, resetUrl, "password-reset");
+
+    res.json({
+      message:
+        "If an account with that email exists, a reset link has been sent.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Reset password
+ * @route POST /api/auth/reset-password
+ */
+export const resetPassword = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { token, newPassword, confirmPassword } = req.body;
+
+    // Validate input
+    if (!token || !newPassword || !confirmPassword) {
+      throw new AppError(
+        "Token, new password, and confirm password are required",
+        400
+      );
+    }
+
+    if (newPassword !== confirmPassword) {
+      throw new AppError("Passwords do not match", 400);
+    }
+
+    if (newPassword.length < 8) {
+      throw new AppError("Password must be at least 8 characters long", 400);
+    }
+
+    // Hash the token
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    // Find user with valid token and expiration
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: Date.now() },
+    }).select("+resetPasswordToken +resetPasswordExpires");
+
+    if (!user) {
+      throw new AppError("Invalid or expired reset token", 400);
+    }
+
+    // Update password and clear reset fields
+    user.password = newPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    res.json({ message: "Password has been reset successfully" });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Validate reset password token
+ * @route POST /api/auth/validate-reset-token
+ */
+export const validateResetToken = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      throw new AppError("Token is required", 400);
+    }
+
+    // Hash the token
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    // Find user with valid token and expiration
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: Date.now() },
+    }).select("+resetPasswordToken +resetPasswordExpires");
+
+    if (!user) {
+      throw new AppError("Invalid or expired reset token", 400);
+    }
+
+    res.json({ message: "Token is valid" });
+  } catch (error) {
+    next(error);
+  }
+};

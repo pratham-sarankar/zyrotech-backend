@@ -10,6 +10,7 @@ import authRoutes from './routes/auth';
 import profileRoutes from './routes/profile';
 import { errorHandler } from './middleware/errorHandler';
 import { verifySMTPConnection } from './utils/emailUtils';
+import { getResetPasswordPage } from './controllers/authController';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -24,6 +25,9 @@ verifySMTPConnection();
 app.use(cors()); // Enable CORS for all origins
 app.use(express.json()); // Parse JSON request bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded request bodies
+
+// Serve reset password page
+app.get('/reset-password', getResetPasswordPage);
 
 // API Routes
 app.use('/api/auth', authRoutes); // Mount authentication routes
