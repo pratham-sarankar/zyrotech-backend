@@ -5,6 +5,7 @@
 import "dotenv/config";
 import express, { Request, Response } from "express";
 import cors from "cors";
+import morgan from "morgan";
 import connectDB from "./config/database";
 import authRoutes from "./routes/authRoutes";
 import profileRoutes from "./routes/profileRoutes";
@@ -25,6 +26,15 @@ verifySMTPConnection();
 app.use(cors()); // Enable CORS for all origins
 app.use(express.json()); // Parse JSON request bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded request bodies
+
+// Request logging middleware
+if (process.env.NODE_ENV === "development") {
+  // Detailed logging for development
+  app.use(morgan("dev"));
+} else {
+  // Standard logging for production
+  app.use(morgan("combined"));
+}
 
 // Serve reset password page
 app.get("/reset-password", getResetPasswordPage);
