@@ -36,13 +36,17 @@ export const signup = async (
 
     // Validate required fields
     if (!fullName || !email || !password) {
-      throw new AppError("Please provide all required fields", 400);
+      throw new AppError(
+        "Please provide all required fields",
+        400,
+        "missing-required-fields"
+      );
     }
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      throw new AppError("User already exists", 409);
+      throw new AppError("User already exists", 409, "email-already-exists");
     }
 
     // Create new user
@@ -79,24 +83,36 @@ export const sendEmailOTP = async (
 
     // Validate required field
     if (!email) {
-      throw new AppError("Email is required", 400);
+      throw new AppError("Email is required", 400, "missing-email");
     }
 
     // Check if user exists
     const user = await User.findOne({ email });
     if (!user) {
-      throw new AppError("User not found. Please sign up first.", 404);
+      throw new AppError(
+        "User not found. Please sign up first.",
+        404,
+        "user-not-found"
+      );
     }
 
     // Check if email is already verified
     if (user.isEmailVerified) {
-      throw new AppError("Email is already verified", 400);
+      throw new AppError(
+        "Email is already verified",
+        400,
+        "email-already-verified"
+      );
     }
 
     // Check cooldown period
     const isInCooldown = await checkOTPCooldown(email, "email");
     if (isInCooldown) {
-      throw new AppError("Please wait before requesting another OTP", 429);
+      throw new AppError(
+        "Please wait before requesting another OTP",
+        429,
+        "otp-cooldown"
+      );
     }
 
     // Generate and send OTP
@@ -127,7 +143,7 @@ export const verifyEmailOTP = async (
 
     const isValid = await verifyOTP(email, otp, "email");
     if (!isValid) {
-      throw new AppError("Invalid or expired OTP", 400);
+      throw new AppError("Invalid or expired OTP", 400, "invalid-otp");
     }
 
     // Update user verification status
@@ -153,31 +169,48 @@ export const login = async (
 
     // Validate required fields
     if (!email || !password) {
-      throw new AppError("Please provide email and password", 400);
+      throw new AppError(
+        "Please provide email and password",
+        400,
+        "missing-credentials"
+      );
     }
 
     // Find user and check if they exist
     const user = await User.findOne({ email }).select("+password");
     if (!user) {
-      throw new AppError("Invalid email or password", 401);
+      throw new AppError(
+        "Invalid email or password",
+        401,
+        "invalid-credentials"
+      );
     }
 
     // Check if user is Google-authenticated
     if (user.googleId && !user.password) {
       throw new AppError(
         "This account was created using Google. Please sign in with Google.",
-        401
+        401,
+        "google-auth-required"
       );
     }
 
     // Check password
     if (!(await user.comparePassword(password))) {
-      throw new AppError("Invalid email or password", 401);
+      throw new AppError(
+        "Invalid email or password",
+        401,
+        "invalid-credentials"
+      );
     }
 
     // Check email verification
     if (!user.isEmailVerified) {
-      throw new AppError("Please verify your email before logging in", 403);
+      throw new AppError(
+        "Please verify your email before logging in",
+        403,
+        "email-not-verified"
+      );
     }
 
     // Generate JWT token
@@ -217,11 +250,15 @@ export const googleAuth = async (
     const { idToken } = req.body;
 
     if (!idToken) {
-      throw new AppError("ID token is required", 400);
+      throw new AppError("ID token is required", 400, "missing-id-token");
     }
 
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_IOS_CLIENT_ID) {
-      throw new AppError("Google Client IDs are not configured", 500);
+      throw new AppError(
+        "Google Client IDs are not configured",
+        500,
+        "google-config-error"
+      );
     }
 
     // Verify the Google ID token
@@ -236,13 +273,17 @@ export const googleAuth = async (
 
       const payload = ticket.getPayload();
       if (!payload) {
-        throw new AppError("Invalid ID token", 401);
+        throw new AppError("Invalid ID token", 401, "invalid-google-token");
       }
 
       const { email, name, picture, sub: googleId } = payload;
 
       if (!email) {
-        throw new AppError("Email is required from Google profile", 400);
+        throw new AppError(
+          "Email is required from Google profile",
+          400,
+          "missing-google-email"
+        );
       }
 
       // Find or create user
@@ -290,13 +331,25 @@ export const googleAuth = async (
     } catch (error) {
       if (error instanceof Error) {
         if (error.message.includes("Wrong recipient")) {
-          throw new AppError("Invalid Google Client ID configuration", 500);
+          throw new AppError(
+            "Invalid Google Client ID configuration",
+            500,
+            "invalid-google-config"
+          );
         }
         if (error.message.includes("Token used too late")) {
-          throw new AppError("Google token has expired", 401);
+          throw new AppError(
+            "Google token has expired",
+            401,
+            "expired-google-token"
+          );
         }
         if (error.message.includes("Invalid token")) {
-          throw new AppError("Invalid Google ID token", 401);
+          throw new AppError(
+            "Invalid Google ID token",
+            401,
+            "invalid-google-token"
+          );
         }
       }
       throw error;
@@ -330,7 +383,7 @@ export const forgotPassword = async (
     const { email } = req.body;
 
     if (!email) {
-      throw new AppError("Email is required", 400);
+      throw new AppError("Email is required", 400, "missing-email");
     }
 
     // Find user and select reset password fields
@@ -389,16 +442,21 @@ export const resetPassword = async (
     if (!token || !newPassword || !confirmPassword) {
       throw new AppError(
         "Token, new password, and confirm password are required",
-        400
+        400,
+        "missing-reset-fields"
       );
     }
 
     if (newPassword !== confirmPassword) {
-      throw new AppError("Passwords do not match", 400);
+      throw new AppError("Passwords do not match", 400, "passwords-dont-match");
     }
 
     if (newPassword.length < 8) {
-      throw new AppError("Password must be at least 8 characters long", 400);
+      throw new AppError(
+        "Password must be at least 8 characters long",
+        400,
+        "password-too-short"
+      );
     }
 
     // Hash the token
@@ -411,7 +469,11 @@ export const resetPassword = async (
     }).select("+resetPasswordToken +resetPasswordExpires");
 
     if (!user) {
-      throw new AppError("Invalid or expired reset token", 400);
+      throw new AppError(
+        "Invalid or expired reset token",
+        400,
+        "invalid-reset-token"
+      );
     }
 
     // Update password and clear reset fields
@@ -439,7 +501,7 @@ export const validateResetToken = async (
     const { token } = req.body;
 
     if (!token) {
-      throw new AppError("Token is required", 400);
+      throw new AppError("Token is required", 400, "missing-token");
     }
 
     // Hash the token
@@ -452,7 +514,11 @@ export const validateResetToken = async (
     }).select("+resetPasswordToken +resetPasswordExpires");
 
     if (!user) {
-      throw new AppError("Invalid or expired reset token", 400);
+      throw new AppError(
+        "Invalid or expired reset token",
+        400,
+        "invalid-reset-token"
+      );
     }
 
     res.json({ message: "Token is valid" });

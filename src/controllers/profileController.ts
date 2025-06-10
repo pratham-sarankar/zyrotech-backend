@@ -20,19 +20,23 @@ export const updatePhoneAndSendOTP = async (
 
     // Validate required field
     if (!phoneNumber) {
-      throw new AppError("Phone number is required", 400);
+      throw new AppError("Phone number is required", 400, "missing-phone");
     }
 
     // Find user
     const user = await User.findById(userId);
     if (!user) {
-      throw new AppError("User not found", 404);
+      throw new AppError("User not found", 404, "user-not-found");
     }
 
     // Check cooldown period
     const isInCooldown = await checkOTPCooldown(phoneNumber, "phone");
     if (isInCooldown) {
-      throw new AppError("Please wait before requesting another OTP", 429);
+      throw new AppError(
+        "Please wait before requesting another OTP",
+        429,
+        "otp-cooldown"
+      );
     }
 
     // Update user's phone number if it's different
@@ -41,7 +45,11 @@ export const updatePhoneAndSendOTP = async (
       user.isPhoneVerified = false;
       await user.save();
     } else {
-      throw new AppError("Phone number is already verified", 400);
+      throw new AppError(
+        "Phone number is already verified",
+        400,
+        "phone-already-verified"
+      );
     }
 
     // TODO: Implement SMS sending functionality
@@ -71,17 +79,33 @@ export const verifyPhoneOTP = async (
     const { phoneNumber, otp } = req.body;
     const userId = req.user.id;
 
+    if (!phoneNumber || !otp) {
+      throw new AppError(
+        "Phone number and OTP are required",
+        400,
+        "missing-otp-fields"
+      );
+    }
+
     // Verify OTP
     const isValid = await verifyOTP(phoneNumber, otp, "phone");
     if (!isValid) {
-      throw new AppError("Invalid or expired OTP", 400);
+      throw new AppError("Invalid or expired OTP", 400, "invalid-otp");
     }
 
     // Update user verification status
-    await User.findOneAndUpdate(
+    const user = await User.findOneAndUpdate(
       { _id: userId, phoneNumber },
       { isPhoneVerified: true }
     );
+
+    if (!user) {
+      throw new AppError(
+        "User not found or phone number mismatch",
+        404,
+        "user-not-found"
+      );
+    }
 
     res.json({ message: "Phone number verified successfully" });
   } catch (error) {
@@ -105,13 +129,17 @@ export const setPin = async (
 
     // Validate PIN
     if (!pin || !/^\d{6}$/.test(pin)) {
-      throw new AppError("PIN must be a 6-digit number", 400);
+      throw new AppError(
+        "PIN must be a 6-digit number",
+        400,
+        "invalid-pin-format"
+      );
     }
 
     // Find user
     const user = await User.findById(userId);
     if (!user) {
-      throw new AppError("User not found", 404);
+      throw new AppError("User not found", 404, "user-not-found");
     }
 
     // Hash PIN
@@ -144,24 +172,28 @@ export const verifyPin = async (
 
     // Validate PIN
     if (!pin || !/^\d{6}$/.test(pin)) {
-      throw new AppError("PIN must be a 6-digit number", 400);
+      throw new AppError(
+        "PIN must be a 6-digit number",
+        400,
+        "invalid-pin-format"
+      );
     }
 
     // Find user with hashedPin
     const user = await User.findById(userId).select("+hashedPin");
     if (!user) {
-      throw new AppError("User not found", 404);
+      throw new AppError("User not found", 404, "user-not-found");
     }
 
     // Check if PIN is set
     if (!user.hashedPin) {
-      throw new AppError("PIN not set", 400);
+      throw new AppError("PIN not set", 400, "pin-not-set");
     }
 
     // Verify PIN
     const isValid = await user.comparePin(pin);
     if (!isValid) {
-      throw new AppError("Invalid PIN", 401);
+      throw new AppError("Invalid PIN", 401, "invalid-pin");
     }
 
     res.json({ message: "PIN verified successfully" });
@@ -186,34 +218,44 @@ export const updatePassword = async (
 
     // Validate input
     if (!password || !newPassword) {
-      throw new AppError("Current password and new password are required", 400);
+      throw new AppError(
+        "Current password and new password are required",
+        400,
+        "missing-password-fields"
+      );
     }
 
     if (newPassword.length < 8) {
       throw new AppError(
         "New password must be at least 8 characters long",
-        400
+        400,
+        "password-too-short"
       );
     }
 
     // Get user with password
     const user = await User.findById(userId).select("+password");
     if (!user) {
-      throw new AppError("User not found", 404);
+      throw new AppError("User not found", 404, "user-not-found");
     }
 
     // Check if user has a password (not Google-only account)
     if (!user.password) {
       throw new AppError(
         "This account was created using Google. Please use Google to sign in.",
-        400
+        400,
+        "google-auth-required"
       );
     }
 
     // Verify current password
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
-      throw new AppError("Current password is incorrect", 401);
+      throw new AppError(
+        "Current password is incorrect",
+        401,
+        "invalid-current-password"
+      );
     }
 
     // Update password
