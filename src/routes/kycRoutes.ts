@@ -501,4 +501,30 @@ router.post("/experience", auth, async (req, res, next) => {
   }
 });
 
+/**
+ * @route GET /api/kyc/status
+ * @desc Get the complete KYC status and details for the authenticated user
+ * @access Private
+ */
+router.get("/status", auth, async (req, res, next) => {
+  try {
+    const kyc = await KYC.findOne({ userId: req.user._id });
+
+    if (!kyc) {
+      throw new AppError(
+        "No KYC record found for this user",
+        404,
+        "kyc-not-found"
+      );
+    }
+
+    res.status(200).json({
+      status: "success",
+      data: kyc,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

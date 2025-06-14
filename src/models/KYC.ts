@@ -74,8 +74,8 @@ export interface IKYC extends Document {
   // employmentDetails?: IEmploymentDetails;
   // bankDetails?: IBankDetails;
   status: "pending" | "in_progress" | "completed" | "rejected";
-  lastUpdatedAt: Date;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 /**
