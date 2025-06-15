@@ -137,6 +137,8 @@ router.put("/", async (req, res, next) => {
           phoneNumber: user.phoneNumber,
           isEmailVerified: user.isEmailVerified,
           isPhoneVerified: user.isPhoneVerified,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
         },
       },
     });
