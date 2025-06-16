@@ -116,7 +116,9 @@ router.put("/", async (req, res, next) => {
       req.user._id,
       { $set: updateData },
       { new: true, runValidators: true }
-    ).select("-password -hashedPin -resetPasswordToken -resetPasswordExpires");
+    ).select(
+      "fullName email phoneNumber isEmailVerified isPhoneVerified createdAt updatedAt"
+    );
 
     if (!user) {
       throw new AppError(
@@ -137,6 +139,8 @@ router.put("/", async (req, res, next) => {
           phoneNumber: user.phoneNumber,
           isEmailVerified: user.isEmailVerified,
           isPhoneVerified: user.isPhoneVerified,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
         },
       },
     });
