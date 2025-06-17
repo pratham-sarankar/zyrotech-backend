@@ -508,7 +508,7 @@ router.post("/experience", auth, async (req, res, next) => {
  */
 router.get("/status", auth, async (req, res, next) => {
   try {
-    const kyc = await KYC.findOne({ userId: req.user._id });
+    const kyc = await KYC.findOne({ userId: req.user._id }).select("-__v");
 
     if (!kyc) {
       throw new AppError(
@@ -518,9 +518,16 @@ router.get("/status", auth, async (req, res, next) => {
       );
     }
 
+    // Transform the document to convert _id to id
+    const transformedKyc = {
+      ...kyc.toObject(),
+      id: kyc._id,
+    };
+    delete transformedKyc._id;
+
     res.status(200).json({
       status: "success",
-      data: kyc,
+      data: transformedKyc,
     });
   } catch (error) {
     next(error);

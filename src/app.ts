@@ -10,6 +10,8 @@ import connectDB from "./config/database";
 import authRoutes from "./routes/authRoutes";
 import profileRoutes from "./routes/profileRoutes";
 import kycRoutes from "./routes/kycRoutes";
+import botRoutes from "./routes/botRoutes";
+import subscriptionRoutes from "./routes/subscriptionRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 import { verifySMTPConnection } from "./utils/emailUtils";
 import { getResetPasswordPage } from "./controllers/authController";
@@ -44,6 +46,8 @@ app.get("/reset-password", getResetPasswordPage);
 app.use("/api/auth", authRoutes); // Mount authentication routes
 app.use("/api/profile", profileRoutes);
 app.use("/api/kyc", kycRoutes);
+app.use("/api/bots", botRoutes);
+app.use("/api/subscriptions", subscriptionRoutes);
 
 // Health check endpoint
 app.get("/", (_req: Request, res: Response) => {
