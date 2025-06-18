@@ -12,6 +12,7 @@ import profileRoutes from "./routes/profileRoutes";
 import kycRoutes from "./routes/kycRoutes";
 import botRoutes from "./routes/botRoutes";
 import subscriptionRoutes from "./routes/subscriptionRoutes";
+import signalRoutes from "./routes/signalRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 import { verifySMTPConnection } from "./utils/emailUtils";
 import { getResetPasswordPage } from "./controllers/authController";
@@ -48,6 +49,7 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/kyc", kycRoutes);
 app.use("/api/bots", botRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
+app.use("/api/signals", signalRoutes);
 
 // Health check endpoint
 app.get("/", (_req: Request, res: Response) => {
