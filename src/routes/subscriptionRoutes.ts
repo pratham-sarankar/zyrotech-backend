@@ -231,6 +231,51 @@ router.put("/:id/cancel", async (req, res, next) => {
 });
 
 /**
+ * @route GET /api/subscriptions/check/:botId
+ * @desc Check if user is subscribed to a specific bot
+ * @access Private
+ */
+router.get("/check/:botId", async (req, res, next) => {
+  try {
+    const { botId } = req.params;
+
+    // Check if bot exists
+    const bot = await Bot.findById(botId);
+    if (!bot) {
+      throw new AppError("Bot not found", 404, "bot-not-found");
+    }
+
+    // Check if user is subscribed to this bot
+    const subscription = await BotSubscription.findOne({
+      userId: req.user._id,
+      botId: botId,
+    });
+
+    const isSubscribed = Boolean(
+      subscription && subscription.status === "active"
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        botId: botId,
+        isSubscribed: isSubscribed,
+        subscription: subscription
+          ? {
+              id: subscription._id,
+              status: subscription.status,
+              subscribedAt: subscription.subscribedAt,
+              cancelledAt: subscription.cancelledAt,
+            }
+          : null,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * @route DELETE /api/subscriptions/:id
  * @desc Delete a subscription (permanent removal)
  * @access Private
