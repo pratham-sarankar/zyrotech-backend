@@ -3,7 +3,6 @@ import { auth } from "../middleware/auth";
 import { AppError } from "../middleware/errorHandler";
 import axios from "axios";
 import * as crypto from "crypto";
-import { DeltaRestClient } from "../utils/deltaRestClient";
 
 const router = express.Router();
 
@@ -20,12 +19,6 @@ interface BinanceBalance {
 
 interface BinanceAccountResponse {
   balances: BinanceBalance[];
-}
-
-interface DeltaBalanceResponse {
-  asset_symbol: string;
-  available_balance: string;
-  user_id: string;
 }
 
 /**
@@ -60,22 +53,18 @@ async function getAccountInfo(apiKey: string, apiSecret: string) {
  * Get asset balance from Delta Exchange
  */
 async function getAssetBalance(apiKey: string, apiSecret: string) {
-  // Get current timestamp in milliseconds
-  const timestamp = Date.now();
-
-  const deltaClient = new DeltaRestClient(
-    "https://api.india.delta.exchange",
-    apiKey,
-    apiSecret,
-    timestamp
-  );
-
-  const response = await deltaClient.getBalances(14);
-  return {
-    status: "success",
-    message: "Balance retrieved successfully.",
-    data: response,
-  };
+  try {
+    const response = await axios.post(
+      "http://182.70.249.152:1101/asset-delta-balance",
+      {
+        api_key: apiKey,
+        api_secret: apiSecret,
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
 }
 
 /**
@@ -162,36 +151,11 @@ router.post("/asset-delta-balance", async (req, res) => {
       );
     }
 
-    // Get current balance
+    // Get current balance from the external API
     const response = await getAssetBalance(api_key, api_secret);
 
-    if (response === null) {
-      return res.status(200).json({
-        status: "error",
-        message: "No balance found!",
-        data: null,
-      });
-    }
-
-    if (response.status === "error") {
-      return res.status(400).json({
-        status: "error",
-        message: `Error: ${response.message}`,
-        data: response,
-      });
-    }
-
-    return res.status(200).json({
-      status: "success",
-      message: "Balance retrieved successfully.",
-      data: {
-        asset: (response.data as DeltaBalanceResponse).asset_symbol,
-        available_balance: parseFloat(
-          (response.data as DeltaBalanceResponse).available_balance
-        ),
-        user_id: parseFloat((response.data as DeltaBalanceResponse).user_id),
-      },
-    });
+    // Return the response as-is from the external API
+    return res.status(200).json(response);
   } catch (error: any) {
     return res.status(400).json({
       status: "error",
