@@ -108,6 +108,15 @@ router.post("/", async (req, res, next) => {
     delete transformedSignal._id;
     delete transformedSignal.__v;
 
+    // Transform botId to bot format
+    if (transformedSignal.botId) {
+      transformedSignal.bot = {
+        id: transformedSignal.botId._id,
+        name: transformedSignal.botId.name,
+      };
+      delete transformedSignal.botId;
+    }
+
     res.status(201).json({
       status: "success",
       message: "Signal created successfully",
@@ -228,6 +237,16 @@ router.get("/", async (req, res, next) => {
         id: signal._id,
       };
       delete transformedSignal._id;
+
+      // Transform botId to bot format
+      if (transformedSignal.botId) {
+        transformedSignal.bot = {
+          id: transformedSignal.botId._id,
+          name: transformedSignal.botId.name,
+        };
+        delete transformedSignal.botId;
+      }
+
       return transformedSignal;
     });
 
@@ -270,6 +289,15 @@ router.get("/:id", async (req, res, next) => {
       id: signal._id,
     };
     delete transformedSignal._id;
+
+    // Transform botId to bot format
+    if (transformedSignal.botId) {
+      transformedSignal.bot = {
+        id: transformedSignal.botId._id,
+        name: transformedSignal.botId.name,
+      };
+      delete transformedSignal.botId;
+    }
 
     res.status(200).json({
       status: "success",
@@ -358,6 +386,15 @@ router.put("/:id", async (req, res, next) => {
       id: signal._id,
     };
     delete transformedSignal._id;
+
+    // Transform botId to bot format
+    if (transformedSignal.botId) {
+      transformedSignal.bot = {
+        id: transformedSignal.botId._id,
+        name: transformedSignal.botId.name,
+      };
+      delete transformedSignal.botId;
+    }
 
     res.status(200).json({
       status: "success",
