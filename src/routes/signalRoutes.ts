@@ -208,13 +208,110 @@ router.post("/bulk", async (req, res, next) => {
  */
 router.get("/", async (req, res, next) => {
   try {
-    const { botId, direction, limit = 50, page = 1 } = req.query;
+    const {
+      botId,
+      direction,
+      limit = 50,
+      page = 1,
+      startDate,
+      endDate,
+      date,
+      today,
+      yesterday,
+      thisWeek,
+      thisMonth,
+    } = req.query;
 
     // Build query
     const query: any = {};
     if (botId) query.botId = botId;
     if (direction && ["LONG", "SHORT"].includes(direction as string)) {
       query.direction = direction;
+    }
+
+    // Date filtering
+    if (
+      startDate ||
+      endDate ||
+      date ||
+      (today && ["true", "1", "yes"].includes(today as string)) ||
+      (yesterday && ["true", "1", "yes"].includes(yesterday as string)) ||
+      (thisWeek && ["true", "1", "yes"].includes(thisWeek as string)) ||
+      (thisMonth && ["true", "1", "yes"].includes(thisMonth as string))
+    ) {
+      query.signalTime = {};
+
+      // Validate date parameters
+      const validateDate = (dateStr: string, paramName: string) => {
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) {
+          throw new AppError(
+            `Invalid ${paramName} format. Please use ISO date format (YYYY-MM-DD)`,
+            400,
+            "invalid-date-format"
+          );
+        }
+        return date;
+      };
+
+      // Exact date filter
+      if (date) {
+        const targetDate = validateDate(date as string, "date");
+        const nextDay = new Date(targetDate);
+        nextDay.setDate(nextDay.getDate() + 1);
+
+        query.signalTime.$gte = targetDate;
+        query.signalTime.$lt = nextDay;
+      }
+
+      // Date range filter
+      if (startDate) {
+        query.signalTime.$gte = validateDate(startDate as string, "startDate");
+      }
+      if (endDate) {
+        const endDateTime = validateDate(endDate as string, "endDate");
+        endDateTime.setDate(endDateTime.getDate() + 1); // Include the entire end date
+        query.signalTime.$lt = endDateTime;
+      }
+
+      // Common date range filters
+      if (today && ["true", "1", "yes"].includes(today as string)) {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date();
+        todayEnd.setHours(23, 59, 59, 999);
+
+        query.signalTime.$gte = todayStart;
+        query.signalTime.$lte = todayEnd;
+      }
+
+      if (yesterday && ["true", "1", "yes"].includes(yesterday as string)) {
+        const yesterdayStart = new Date();
+        yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+        yesterdayStart.setHours(0, 0, 0, 0);
+        const yesterdayEnd = new Date();
+        yesterdayEnd.setDate(yesterdayEnd.getDate() - 1);
+        yesterdayEnd.setHours(23, 59, 59, 999);
+
+        query.signalTime.$gte = yesterdayStart;
+        query.signalTime.$lte = yesterdayEnd;
+      }
+
+      if (thisWeek && ["true", "1", "yes"].includes(thisWeek as string)) {
+        const now = new Date();
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
+        startOfWeek.setHours(0, 0, 0, 0);
+
+        query.signalTime.$gte = startOfWeek;
+      }
+
+      if (thisMonth && ["true", "1", "yes"].includes(thisMonth as string)) {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        query.signalTime.$gte = startOfMonth;
+      }
     }
 
     // Pagination
@@ -438,7 +535,18 @@ router.delete("/:id", async (req, res, next) => {
 router.get("/bot/:botId", async (req, res, next) => {
   try {
     const { botId } = req.params;
-    const { direction, limit = 50, page = 1 } = req.query;
+    const {
+      direction,
+      limit = 50,
+      page = 1,
+      startDate,
+      endDate,
+      date,
+      today,
+      yesterday,
+      thisWeek,
+      thisMonth,
+    } = req.query;
 
     // Check if bot exists
     const bot = await Bot.findById(botId);
@@ -450,6 +558,91 @@ router.get("/bot/:botId", async (req, res, next) => {
     const query: any = { botId };
     if (direction && ["LONG", "SHORT"].includes(direction as string)) {
       query.direction = direction;
+    }
+
+    // Date filtering
+    if (
+      startDate ||
+      endDate ||
+      date ||
+      (today && ["true", "1", "yes"].includes(today as string)) ||
+      (yesterday && ["true", "1", "yes"].includes(yesterday as string)) ||
+      (thisWeek && ["true", "1", "yes"].includes(thisWeek as string)) ||
+      (thisMonth && ["true", "1", "yes"].includes(thisMonth as string))
+    ) {
+      query.signalTime = {};
+
+      // Validate date parameters
+      const validateDate = (dateStr: string, paramName: string) => {
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) {
+          throw new AppError(
+            `Invalid ${paramName} format. Please use ISO date format (YYYY-MM-DD)`,
+            400,
+            "invalid-date-format"
+          );
+        }
+        return date;
+      };
+
+      // Exact date filter
+      if (date) {
+        const targetDate = validateDate(date as string, "date");
+        const nextDay = new Date(targetDate);
+        nextDay.setDate(nextDay.getDate() + 1);
+
+        query.signalTime.$gte = targetDate;
+        query.signalTime.$lt = nextDay;
+      }
+
+      // Date range filter
+      if (startDate) {
+        query.signalTime.$gte = validateDate(startDate as string, "startDate");
+      }
+      if (endDate) {
+        const endDateTime = validateDate(endDate as string, "endDate");
+        endDateTime.setDate(endDateTime.getDate() + 1); // Include the entire end date
+        query.signalTime.$lt = endDateTime;
+      }
+
+      // Common date range filters
+      if (today && ["true", "1", "yes"].includes(today as string)) {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date();
+        todayEnd.setHours(23, 59, 59, 999);
+
+        query.signalTime.$gte = todayStart;
+        query.signalTime.$lte = todayEnd;
+      }
+
+      if (yesterday && ["true", "1", "yes"].includes(yesterday as string)) {
+        const yesterdayStart = new Date();
+        yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+        yesterdayStart.setHours(0, 0, 0, 0);
+        const yesterdayEnd = new Date();
+        yesterdayEnd.setDate(yesterdayEnd.getDate() - 1);
+        yesterdayEnd.setHours(23, 59, 59, 999);
+
+        query.signalTime.$gte = yesterdayStart;
+        query.signalTime.$lte = yesterdayEnd;
+      }
+
+      if (thisWeek && ["true", "1", "yes"].includes(thisWeek as string)) {
+        const now = new Date();
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
+        startOfWeek.setHours(0, 0, 0, 0);
+
+        query.signalTime.$gte = startOfWeek;
+      }
+
+      if (thisMonth && ["true", "1", "yes"].includes(thisMonth as string)) {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        query.signalTime.$gte = startOfMonth;
+      }
     }
 
     // Pagination
