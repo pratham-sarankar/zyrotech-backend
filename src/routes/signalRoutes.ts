@@ -3,6 +3,7 @@ import { auth } from "../middleware/auth";
 import { AppError } from "../middleware/errorHandler";
 import Signal from "../models/Signal";
 import Bot from "../models/Bot";
+import mongoose from "mongoose";
 
 const router = express.Router();
 
@@ -229,6 +230,11 @@ router.get("/", async (req, res, next) => {
       query.direction = direction;
     }
 
+    // Convert botId to ObjectId if it's a string (for aggregation compatibility)
+    if (query.botId && typeof query.botId === "string") {
+      query.botId = new mongoose.Types.ObjectId(query.botId);
+    }
+
     // Date filtering
     if (
       startDate ||
@@ -317,6 +323,7 @@ router.get("/", async (req, res, next) => {
     // Pagination
     const skip = (Number(page) - 1) * Number(limit);
 
+    // Get signals with pagination
     const signals = await Signal.find(query)
       .populate("botId", "name")
       .select("-__v")
@@ -326,6 +333,123 @@ router.get("/", async (req, res, next) => {
 
     // Get total count for pagination
     const totalSignals = await Signal.countDocuments(query);
+
+    // Get performance overview using a single aggregation query
+    const overviewAgg = await Signal.aggregate([
+      { $match: query },
+      { $sort: { signalTime: 1 } }, // Sort by signal time to track consecutive streaks
+      {
+        $group: {
+          _id: null,
+          totalSignals: { $sum: 1 },
+          totalLongSignals: {
+            $sum: { $cond: [{ $eq: ["$direction", "LONG"] }, 1, 0] },
+          },
+          totalShortSignals: {
+            $sum: { $cond: [{ $eq: ["$direction", "SHORT"] }, 1, 0] },
+          },
+          highestProfit: { $max: "$profitLoss" },
+          highestLoss: { $min: "$profitLoss" },
+          totalPnL: { $sum: "$profitLoss" },
+          signals: { $push: { profitLoss: "$profitLoss" } },
+        },
+      },
+      {
+        $addFields: {
+          consecutiveWins: {
+            $let: {
+              vars: {
+                winStreaks: {
+                  $reduce: {
+                    input: "$signals",
+                    initialValue: { currentStreak: 0, maxStreak: 0 },
+                    in: {
+                      currentStreak: {
+                        $cond: [
+                          { $gt: ["$$this.profitLoss", 0] },
+                          { $add: ["$$value.currentStreak", 1] },
+                          0,
+                        ],
+                      },
+                      maxStreak: {
+                        $max: [
+                          "$$value.maxStreak",
+                          {
+                            $cond: [
+                              { $gt: ["$$this.profitLoss", 0] },
+                              { $add: ["$$value.currentStreak", 1] },
+                              "$$value.maxStreak",
+                            ],
+                          },
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+              in: "$$winStreaks.maxStreak",
+            },
+          },
+          consecutiveLosses: {
+            $let: {
+              vars: {
+                lossStreaks: {
+                  $reduce: {
+                    input: "$signals",
+                    initialValue: { currentStreak: 0, maxStreak: 0 },
+                    in: {
+                      currentStreak: {
+                        $cond: [
+                          { $lt: ["$$this.profitLoss", 0] },
+                          { $add: ["$$value.currentStreak", 1] },
+                          0,
+                        ],
+                      },
+                      maxStreak: {
+                        $max: [
+                          "$$value.maxStreak",
+                          {
+                            $cond: [
+                              { $lt: ["$$this.profitLoss", 0] },
+                              { $add: ["$$value.currentStreak", 1] },
+                              "$$value.maxStreak",
+                            ],
+                          },
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+              in: "$$lossStreaks.maxStreak",
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          totalSignals: 1,
+          totalLongSignals: 1,
+          totalShortSignals: 1,
+          highestProfit: 1,
+          highestLoss: 1,
+          totalPnL: 1,
+          consecutiveWins: 1,
+          consecutiveLosses: 1,
+        },
+      },
+    ]);
+    const overview = overviewAgg[0] || {
+      totalSignals: 0,
+      totalLongSignals: 0,
+      totalShortSignals: 0,
+      highestProfit: 0,
+      highestLoss: 0,
+      totalPnL: 0,
+      consecutiveWins: 0,
+      consecutiveLosses: 0,
+    };
 
     // Transform response
     const transformedSignals = signals.map((signal) => {
@@ -350,6 +474,7 @@ router.get("/", async (req, res, next) => {
     res.status(200).json({
       status: "success",
       data: transformedSignals,
+      performanceOverview: overview,
       pagination: {
         currentPage: Number(page),
         totalPages: Math.ceil(totalSignals / Number(limit)),
@@ -560,6 +685,11 @@ router.get("/bot/:botId", async (req, res, next) => {
       query.direction = direction;
     }
 
+    // Convert botId to ObjectId if it's a string (for aggregation compatibility)
+    if (query.botId && typeof query.botId === "string") {
+      query.botId = new mongoose.Types.ObjectId(query.botId);
+    }
+
     // Date filtering
     if (
       startDate ||
@@ -648,6 +778,7 @@ router.get("/bot/:botId", async (req, res, next) => {
     // Pagination
     const skip = (Number(page) - 1) * Number(limit);
 
+    // Get signals with pagination
     const signals = await Signal.find(query)
       .select("-__v")
       .sort({ signalTime: -1 })
@@ -656,6 +787,123 @@ router.get("/bot/:botId", async (req, res, next) => {
 
     // Get total count for pagination
     const totalSignals = await Signal.countDocuments(query);
+
+    // Get performance overview using a single aggregation query
+    const overviewAgg = await Signal.aggregate([
+      { $match: query },
+      { $sort: { signalTime: 1 } }, // Sort by signal time to track consecutive streaks
+      {
+        $group: {
+          _id: null,
+          totalSignals: { $sum: 1 },
+          totalLongSignals: {
+            $sum: { $cond: [{ $eq: ["$direction", "LONG"] }, 1, 0] },
+          },
+          totalShortSignals: {
+            $sum: { $cond: [{ $eq: ["$direction", "SHORT"] }, 1, 0] },
+          },
+          highestProfit: { $max: "$profitLoss" },
+          highestLoss: { $min: "$profitLoss" },
+          totalPnL: { $sum: "$profitLoss" },
+          signals: { $push: { profitLoss: "$profitLoss" } },
+        },
+      },
+      {
+        $addFields: {
+          consecutiveWins: {
+            $let: {
+              vars: {
+                winStreaks: {
+                  $reduce: {
+                    input: "$signals",
+                    initialValue: { currentStreak: 0, maxStreak: 0 },
+                    in: {
+                      currentStreak: {
+                        $cond: [
+                          { $gt: ["$$this.profitLoss", 0] },
+                          { $add: ["$$value.currentStreak", 1] },
+                          0,
+                        ],
+                      },
+                      maxStreak: {
+                        $max: [
+                          "$$value.maxStreak",
+                          {
+                            $cond: [
+                              { $gt: ["$$this.profitLoss", 0] },
+                              { $add: ["$$value.currentStreak", 1] },
+                              "$$value.maxStreak",
+                            ],
+                          },
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+              in: "$$winStreaks.maxStreak",
+            },
+          },
+          consecutiveLosses: {
+            $let: {
+              vars: {
+                lossStreaks: {
+                  $reduce: {
+                    input: "$signals",
+                    initialValue: { currentStreak: 0, maxStreak: 0 },
+                    in: {
+                      currentStreak: {
+                        $cond: [
+                          { $lt: ["$$this.profitLoss", 0] },
+                          { $add: ["$$value.currentStreak", 1] },
+                          0,
+                        ],
+                      },
+                      maxStreak: {
+                        $max: [
+                          "$$value.maxStreak",
+                          {
+                            $cond: [
+                              { $lt: ["$$this.profitLoss", 0] },
+                              { $add: ["$$value.currentStreak", 1] },
+                              "$$value.maxStreak",
+                            ],
+                          },
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+              in: "$$lossStreaks.maxStreak",
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          totalSignals: 1,
+          totalLongSignals: 1,
+          totalShortSignals: 1,
+          highestProfit: 1,
+          highestLoss: 1,
+          totalPnL: 1,
+          consecutiveWins: 1,
+          consecutiveLosses: 1,
+        },
+      },
+    ]);
+    const overview = overviewAgg[0] || {
+      totalSignals: 0,
+      totalLongSignals: 0,
+      totalShortSignals: 0,
+      highestProfit: 0,
+      highestLoss: 0,
+      totalPnL: 0,
+      consecutiveWins: 0,
+      consecutiveLosses: 0,
+    };
 
     // Transform response
     const transformedSignals = signals.map((signal) => {
@@ -675,6 +923,7 @@ router.get("/bot/:botId", async (req, res, next) => {
           name: bot.name,
         },
         signals: transformedSignals,
+        performanceOverview: overview,
         pagination: {
           currentPage: Number(page),
           totalPages: Math.ceil(totalSignals / Number(limit)),
