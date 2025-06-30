@@ -3,6 +3,7 @@ import { auth } from "../middleware/auth";
 import { AppError } from "../middleware/errorHandler";
 import Signal from "../models/Signal";
 import Bot from "../models/Bot";
+import BotSubscription from "../models/BotSubscription";
 import mongoose from "mongoose";
 
 const router = express.Router();
@@ -124,7 +125,7 @@ router.post("/", async (req, res, next) => {
       data: transformedSignal,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -198,7 +199,7 @@ router.post("/bulk", async (req, res, next) => {
       },
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -484,7 +485,344 @@ router.get("/", async (req, res, next) => {
       },
     });
   } catch (error) {
-    next(error);
+    return next(error);
+  }
+});
+
+/**
+ * @route GET /api/signals/user
+ * @desc Get all signals from bots the user has subscribed to
+ * @access Private
+ */
+router.get("/user", async (req, res, next) => {
+  try {
+    const {
+      direction,
+      limit = 50,
+      page = 1,
+      startDate,
+      endDate,
+      date,
+      today,
+      yesterday,
+      thisWeek,
+      thisMonth,
+      status, // 'opened' or 'closed'
+    } = req.query;
+
+    // Get user ID from auth middleware
+    const userId = req.user.id;
+
+    // Get all active bot subscriptions for the user
+    const userSubscriptions = await BotSubscription.find({
+      userId: userId,
+      status: "active",
+    }).select("botId");
+
+    const activeBotsCount = userSubscriptions.length;
+
+    if (userSubscriptions.length === 0) {
+      return res.status(200).json({
+        status: "success",
+        data: [],
+        activeBotsCount: 0,
+        performanceOverview: {
+          totalSignals: 0,
+          totalLongSignals: 0,
+          totalShortSignals: 0,
+          highestProfit: 0,
+          highestLoss: 0,
+          totalPnL: 0,
+          consecutiveWins: 0,
+          consecutiveLosses: 0,
+        },
+        pagination: {
+          currentPage: Number(page),
+          totalPages: 0,
+          totalSignals: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
+      });
+    }
+
+    // Extract bot IDs from subscriptions
+    const botIds = userSubscriptions.map((sub) => sub.botId);
+
+    // Build query
+    const query: any = { botId: { $in: botIds } };
+    if (direction && ["LONG", "SHORT"].includes(direction as string)) {
+      query.direction = direction;
+    }
+
+    // Status filtering (opened vs closed signals)
+    if (status && ["opened", "closed"].includes(status as string)) {
+      if (status === "opened") {
+        // Opened signals: no exitTime or exitPrice
+        query.$or = [
+          { exitTime: { $exists: false } },
+          { exitTime: null },
+          { exitPrice: { $exists: false } },
+          { exitPrice: null },
+        ];
+      } else if (status === "closed") {
+        // Closed signals: have both exitTime and exitPrice
+        query.exitTime = { $exists: true, $ne: null };
+        query.exitPrice = { $exists: true, $ne: null };
+      }
+    }
+
+    // Date filtering
+    if (
+      startDate ||
+      endDate ||
+      date ||
+      (today && ["true", "1", "yes"].includes(today as string)) ||
+      (yesterday && ["true", "1", "yes"].includes(yesterday as string)) ||
+      (thisWeek && ["true", "1", "yes"].includes(thisWeek as string)) ||
+      (thisMonth && ["true", "1", "yes"].includes(thisMonth as string))
+    ) {
+      query.signalTime = {};
+
+      // Validate date parameters
+      const validateDate = (dateStr: string, paramName: string) => {
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) {
+          throw new AppError(
+            `Invalid ${paramName} format. Please use ISO date format (YYYY-MM-DD)`,
+            400,
+            "invalid-date-format"
+          );
+        }
+        return date;
+      };
+
+      // Exact date filter
+      if (date) {
+        const targetDate = validateDate(date as string, "date");
+        const nextDay = new Date(targetDate);
+        nextDay.setDate(nextDay.getDate() + 1);
+
+        query.signalTime.$gte = targetDate;
+        query.signalTime.$lt = nextDay;
+      }
+
+      // Date range filter
+      if (startDate) {
+        query.signalTime.$gte = validateDate(startDate as string, "startDate");
+      }
+      if (endDate) {
+        const endDateTime = validateDate(endDate as string, "endDate");
+        endDateTime.setDate(endDateTime.getDate() + 1); // Include the entire end date
+        query.signalTime.$lt = endDateTime;
+      }
+
+      // Common date range filters
+      if (today && ["true", "1", "yes"].includes(today as string)) {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date();
+        todayEnd.setHours(23, 59, 59, 999);
+
+        query.signalTime.$gte = todayStart;
+        query.signalTime.$lte = todayEnd;
+      }
+
+      if (yesterday && ["true", "1", "yes"].includes(yesterday as string)) {
+        const yesterdayStart = new Date();
+        yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+        yesterdayStart.setHours(0, 0, 0, 0);
+        const yesterdayEnd = new Date();
+        yesterdayEnd.setDate(yesterdayEnd.getDate() - 1);
+        yesterdayEnd.setHours(23, 59, 59, 999);
+
+        query.signalTime.$gte = yesterdayStart;
+        query.signalTime.$lte = yesterdayEnd;
+      }
+
+      if (thisWeek && ["true", "1", "yes"].includes(thisWeek as string)) {
+        const now = new Date();
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
+        startOfWeek.setHours(0, 0, 0, 0);
+
+        query.signalTime.$gte = startOfWeek;
+      }
+
+      if (thisMonth && ["true", "1", "yes"].includes(thisMonth as string)) {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        query.signalTime.$gte = startOfMonth;
+      }
+    }
+
+    // Pagination
+    const skip = (Number(page) - 1) * Number(limit);
+
+    // Get signals with pagination
+    const signals = await Signal.find(query)
+      .populate("botId", "name")
+      .select("-__v")
+      .sort({ signalTime: -1 })
+      .skip(skip)
+      .limit(Number(limit));
+
+    // Get total count for pagination
+    const totalSignals = await Signal.countDocuments(query);
+
+    // Get performance overview using a single aggregation query
+    const overviewAgg = await Signal.aggregate([
+      { $match: query },
+      { $sort: { signalTime: 1 } }, // Sort by signal time to track consecutive streaks
+      {
+        $group: {
+          _id: null,
+          totalSignals: { $sum: 1 },
+          totalLongSignals: {
+            $sum: { $cond: [{ $eq: ["$direction", "LONG"] }, 1, 0] },
+          },
+          totalShortSignals: {
+            $sum: { $cond: [{ $eq: ["$direction", "SHORT"] }, 1, 0] },
+          },
+          highestProfit: { $max: "$profitLoss" },
+          highestLoss: { $min: "$profitLoss" },
+          totalPnL: { $sum: "$profitLoss" },
+          signals: { $push: { profitLoss: "$profitLoss" } },
+        },
+      },
+      {
+        $addFields: {
+          consecutiveWins: {
+            $let: {
+              vars: {
+                winStreaks: {
+                  $reduce: {
+                    input: "$signals",
+                    initialValue: { currentStreak: 0, maxStreak: 0 },
+                    in: {
+                      currentStreak: {
+                        $cond: [
+                          { $gt: ["$$this.profitLoss", 0] },
+                          { $add: ["$$value.currentStreak", 1] },
+                          0,
+                        ],
+                      },
+                      maxStreak: {
+                        $max: [
+                          "$$value.maxStreak",
+                          {
+                            $cond: [
+                              { $gt: ["$$this.profitLoss", 0] },
+                              { $add: ["$$value.currentStreak", 1] },
+                              "$$value.maxStreak",
+                            ],
+                          },
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+              in: "$$winStreaks.maxStreak",
+            },
+          },
+          consecutiveLosses: {
+            $let: {
+              vars: {
+                lossStreaks: {
+                  $reduce: {
+                    input: "$signals",
+                    initialValue: { currentStreak: 0, maxStreak: 0 },
+                    in: {
+                      currentStreak: {
+                        $cond: [
+                          { $lt: ["$$this.profitLoss", 0] },
+                          { $add: ["$$value.currentStreak", 1] },
+                          0,
+                        ],
+                      },
+                      maxStreak: {
+                        $max: [
+                          "$$value.maxStreak",
+                          {
+                            $cond: [
+                              { $lt: ["$$this.profitLoss", 0] },
+                              { $add: ["$$value.currentStreak", 1] },
+                              "$$value.maxStreak",
+                            ],
+                          },
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+              in: "$$lossStreaks.maxStreak",
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          totalSignals: 1,
+          totalLongSignals: 1,
+          totalShortSignals: 1,
+          highestProfit: 1,
+          highestLoss: 1,
+          totalPnL: 1,
+          consecutiveWins: 1,
+          consecutiveLosses: 1,
+        },
+      },
+    ]);
+    const overview = overviewAgg[0] || {
+      totalSignals: 0,
+      totalLongSignals: 0,
+      totalShortSignals: 0,
+      highestProfit: 0,
+      highestLoss: 0,
+      totalPnL: 0,
+      consecutiveWins: 0,
+      consecutiveLosses: 0,
+    };
+
+    // Transform response
+    const transformedSignals = signals.map((signal) => {
+      const transformedSignal: any = {
+        ...signal.toObject(),
+        id: signal._id,
+      };
+      delete transformedSignal._id;
+
+      // Transform botId to bot format
+      if (transformedSignal.botId) {
+        transformedSignal.bot = {
+          id: transformedSignal.botId._id,
+          name: transformedSignal.botId.name,
+        };
+        delete transformedSignal.botId;
+      }
+
+      return transformedSignal;
+    });
+
+    res.status(200).json({
+      status: "success",
+      data: transformedSignals,
+      activeBotsCount: activeBotsCount,
+      performanceOverview: overview,
+      pagination: {
+        currentPage: Number(page),
+        totalPages: Math.ceil(totalSignals / Number(limit)),
+        totalSignals,
+        hasNextPage: skip + signals.length < totalSignals,
+        hasPrevPage: Number(page) > 1,
+      },
+    });
+  } catch (error) {
+    return next(error);
   }
 });
 
@@ -526,7 +864,7 @@ router.get("/:id", async (req, res, next) => {
       data: transformedSignal,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -624,7 +962,7 @@ router.put("/:id", async (req, res, next) => {
       data: transformedSignal,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -648,7 +986,7 @@ router.delete("/:id", async (req, res, next) => {
       message: "Signal deleted successfully",
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -934,7 +1272,7 @@ router.get("/bot/:botId", async (req, res, next) => {
       },
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
