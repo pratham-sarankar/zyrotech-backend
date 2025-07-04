@@ -36,23 +36,10 @@ router.post("/", async (req, res, next) => {
       trailCount,
     } = req.body;
 
-    // Validate required fields
-    if (
-      !botId ||
-      !tradeId ||
-      !direction ||
-      !signalTime ||
-      !entryTime ||
-      !entryPrice ||
-      !stoploss ||
-      !target1r ||
-      !target2r ||
-      !exitTime ||
-      !exitPrice ||
-      trailCount === undefined
-    ) {
+    // Validate required fields - only entryTime, entryPrice, and direction are required
+    if (!entryTime || !entryPrice || !direction) {
       throw new AppError(
-        "Please provide all required fields",
+        "Please provide entryTime, entryPrice, and direction",
         400,
         "missing-required-fields"
       );
@@ -67,40 +54,60 @@ router.post("/", async (req, res, next) => {
       );
     }
 
-    // Check if bot exists
-    const bot = await Bot.findById(botId);
-    if (!bot) {
-      throw new AppError("Bot not found", 404, "bot-not-found");
+    // Check if bot exists (if botId is provided)
+    if (botId) {
+      const bot = await Bot.findById(botId);
+      if (!bot) {
+        throw new AppError("Bot not found", 404, "bot-not-found");
+      }
     }
 
-    // Check if signal with same tradeId already exists for this bot
-    const existingSignal = await Signal.findOne({ botId, tradeId });
-    if (existingSignal) {
-      throw new AppError(
-        "Signal with this trade ID already exists for this bot",
-        409,
-        "duplicate-trade-id"
-      );
+    // Auto-generate tradeId if not provided
+    let finalTradeId = tradeId;
+    if (!finalTradeId) {
+      finalTradeId = `TRADE_${Date.now()}_${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
     }
 
-    // Create new signal
-    const signal = await Signal.create({
-      botId,
-      tradeId,
+    // Check if signal with same tradeId already exists for this bot (if botId is provided)
+    if (botId && finalTradeId) {
+      const existingSignal = await Signal.findOne({
+        botId,
+        tradeId: finalTradeId,
+      });
+      if (existingSignal) {
+        throw new AppError(
+          "Signal with this trade ID already exists for this bot",
+          409,
+          "duplicate-trade-id"
+        );
+      }
+    }
+
+    // Prepare signal data with defaults for optional fields
+    const signalData: any = {
       direction,
-      signalTime: new Date(signalTime),
       entryTime: new Date(entryTime),
       entryPrice,
-      stoploss,
-      target1r,
-      target2r,
-      exitTime: new Date(exitTime),
-      exitPrice,
-      exitReason,
-      profitLoss,
-      profitLossR,
-      trailCount,
-    });
+    };
+
+    // Add optional fields if provided
+    if (botId) signalData.botId = botId;
+    if (finalTradeId) signalData.tradeId = finalTradeId;
+    if (signalTime) signalData.signalTime = new Date(signalTime);
+    if (stoploss !== undefined) signalData.stoploss = stoploss;
+    if (target1r !== undefined) signalData.target1r = target1r;
+    if (target2r !== undefined) signalData.target2r = target2r;
+    if (exitTime) signalData.exitTime = new Date(exitTime);
+    if (exitPrice !== undefined) signalData.exitPrice = exitPrice;
+    if (exitReason !== undefined) signalData.exitReason = exitReason;
+    if (profitLoss !== undefined) signalData.profitLoss = profitLoss;
+    if (profitLossR !== undefined) signalData.profitLossR = profitLossR;
+    if (trailCount !== undefined) signalData.trailCount = trailCount;
+
+    // Create new signal
+    const signal = await Signal.create(signalData);
 
     // Transform response
     const transformedSignal: any = {

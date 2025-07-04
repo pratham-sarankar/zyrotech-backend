@@ -4,21 +4,21 @@ import mongoose, { Document } from "mongoose";
  * Interface for Signal document
  */
 export interface ISignal extends Document {
-  botId: mongoose.Types.ObjectId;
-  tradeId: number;
+  botId?: mongoose.Types.ObjectId;
+  tradeId?: string;
   direction: "LONG" | "SHORT";
-  signalTime: Date;
+  signalTime?: Date;
   entryTime: Date;
   entryPrice: number;
-  stoploss: number;
-  target1r: number;
-  target2r: number;
-  exitTime: Date;
-  exitPrice: number;
+  stoploss?: number;
+  target1r?: number;
+  target2r?: number;
+  exitTime?: Date;
+  exitPrice?: number;
   exitReason?: string;
   profitLoss?: number;
   profitLossR?: number;
-  trailCount: number;
+  trailCount?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -31,11 +31,9 @@ const signalSchema = new mongoose.Schema(
     botId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Bot",
-      required: true,
     },
     tradeId: {
-      type: Number,
-      required: [true, "Trade ID is required"],
+      type: String,
       unique: true,
     },
     direction: {
@@ -48,7 +46,6 @@ const signalSchema = new mongoose.Schema(
     },
     signalTime: {
       type: Date,
-      required: [true, "Signal time is required"],
     },
     entryTime: {
       type: Date,
@@ -61,26 +58,21 @@ const signalSchema = new mongoose.Schema(
     },
     stoploss: {
       type: Number,
-      required: [true, "Stop loss is required"],
       min: [0, "Stop loss cannot be negative"],
     },
     target1r: {
       type: Number,
-      required: [true, "Target 1R is required"],
       min: [0, "Target 1R cannot be negative"],
     },
     target2r: {
       type: Number,
-      required: [true, "Target 2R is required"],
       min: [0, "Target 2R cannot be negative"],
     },
     exitTime: {
       type: Date,
-      required: [true, "Exit time is required"],
     },
     exitPrice: {
       type: Number,
-      required: [true, "Exit price is required"],
       min: [0, "Exit price cannot be negative"],
     },
     exitReason: {
@@ -95,7 +87,6 @@ const signalSchema = new mongoose.Schema(
     },
     trailCount: {
       type: Number,
-      required: [true, "Trail count is required"],
       min: [0, "Trail count cannot be negative"],
       default: 0,
     },
