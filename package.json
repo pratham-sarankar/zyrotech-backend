@@ -7,7 +7,8 @@
     "start": "node dist/app.js",
     "dev": "nodemon src/app.ts",
     "build": "tsc && cp -r src/views dist/",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "migrate": "node scripts/migrate.js",
+    "migrate:rollback": "node scripts/migrate.js rollback"
   },
   "keywords": [],
   "author": "",

@@ -15,12 +15,18 @@ router.use(auth);
  */
 router.post("/", async (req, res, next) => {
   try {
-    const { name, html } = req.body;
+    const {
+      name,
+      description,
+      recommendedCapital,
+      performanceDuration,
+      currency,
+    } = req.body;
 
     // Validate required fields
-    if (!name || !html) {
+    if (!name || !description || recommendedCapital === undefined) {
       throw new AppError(
-        "Please provide name and html content",
+        "Please provide name, description, and recommendedCapital",
         400,
         "missing-required-fields"
       );
@@ -39,7 +45,10 @@ router.post("/", async (req, res, next) => {
     // Create new bot
     const bot = await Bot.create({
       name,
-      html,
+      description,
+      recommendedCapital,
+      performanceDuration,
+      currency,
     });
 
     // Transform response to remove __v and convert _id to id
@@ -181,10 +190,22 @@ router.get("/:id/subscribers", async (req, res, next) => {
 router.put("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, html } = req.body;
+    const {
+      name,
+      description,
+      recommendedCapital,
+      performanceDuration,
+      currency,
+    } = req.body;
 
     // Validate at least one field is provided
-    if (!name && !html) {
+    if (
+      !name &&
+      !description &&
+      recommendedCapital === undefined &&
+      !performanceDuration &&
+      !currency
+    ) {
       throw new AppError(
         "Please provide at least one field to update",
         400,
@@ -213,7 +234,12 @@ router.put("/:id", async (req, res, next) => {
     // Prepare update object
     const updateData: any = {};
     if (name) updateData.name = name;
-    if (html) updateData.html = html;
+    if (description !== undefined) updateData.description = description;
+    if (recommendedCapital !== undefined)
+      updateData.recommendedCapital = recommendedCapital;
+    if (performanceDuration)
+      updateData.performanceDuration = performanceDuration;
+    if (currency !== undefined) updateData.currency = currency;
 
     // Update bot
     const bot = await Bot.findByIdAndUpdate(
