@@ -66,6 +66,78 @@ async function seed() {
     // 3. Seed bots (assign to correct group by name)
     const bots = [
       {
+        _id: new mongoose.Types.ObjectId("686d3f381d179df0fd5e5479"),
+        name: "XAU/USD",
+        description:
+          "An advanced trading bot that analyzes market trends, predicts price movements, and executes trades for Apple stock.",
+        recommendedCapital: 100,
+        performanceDuration: "1M",
+        script: "USD",
+        createdAt: new Date("2025-07-08T15:54:32.821Z"),
+        updatedAt: new Date("2025-07-08T16:02:49.296Z"),
+        groupName: "Commodities",
+      },
+      {
+        _id: new mongoose.Types.ObjectId("686d3f381d179df0fd5e5480"),
+        name: "XAG/USD",
+        description:
+          "An advanced trading bot that analyzes market trends, predicts price movements, and executes trades for Apple stock.",
+        recommendedCapital: 100,
+        performanceDuration: "1M",
+        script: "USD",
+        createdAt: new Date("2025-07-08T15:54:32.821Z"),
+        updatedAt: new Date("2025-07-08T16:02:49.296Z"),
+        groupName: "Commodities",
+      },
+      {
+        _id: new mongoose.Types.ObjectId("686d3f381d179df0fd5e5483"),
+        name: "Crude Oil",
+        description:
+          "An advanced trading bot that analyzes market trends, predicts price movements, and executes trades for Apple stock.",
+        recommendedCapital: 100,
+        performanceDuration: "1M",
+        script: "USD",
+        createdAt: new Date("2025-07-08T15:54:32.821Z"),
+        updatedAt: new Date("2025-07-08T16:02:49.296Z"),
+        groupName: "Commodities",
+      },
+      {
+        _id: new mongoose.Types.ObjectId("686d3f381d179df0fd5e5481"),
+        name: "EUR/USD",
+        description:
+          "An advanced trading bot that analyzes market trends, predicts price movements, and executes trades for Apple stock.",
+        recommendedCapital: 100,
+        performanceDuration: "1M",
+        script: "USD",
+        createdAt: new Date("2025-07-08T15:54:32.821Z"),
+        updatedAt: new Date("2025-07-08T16:02:49.296Z"),
+        groupName: "Currency",
+      },
+      {
+        _id: new mongoose.Types.ObjectId("686d3f381d179df0fd5e5482"),
+        name: "JPY/USD",
+        description:
+          "An advanced trading bot that analyzes market trends, predicts price movements, and executes trades for Apple stock.",
+        recommendedCapital: 100,
+        performanceDuration: "1M",
+        script: "USD",
+        createdAt: new Date("2025-07-08T15:54:32.821Z"),
+        updatedAt: new Date("2025-07-08T16:02:49.296Z"),
+        groupName: "Currency",
+      },
+      {
+        _id: new mongoose.Types.ObjectId("686d3f381d179df0fd5e5484"),
+        name: "AUD/USD",
+        description:
+          "An advanced trading bot that analyzes market trends, predicts price movements, and executes trades for Apple stock.",
+        recommendedCapital: 100,
+        performanceDuration: "1M",
+        script: "USD",
+        createdAt: new Date("2025-07-08T15:54:32.821Z"),
+        updatedAt: new Date("2025-07-08T16:02:49.296Z"),
+        groupName: "Currency",
+      },
+      {
         _id: new mongoose.Types.ObjectId("686d3f381d179df0fd5e5471"),
         name: "Apple",
         description:
