@@ -11,7 +11,7 @@ import Bot from "../models/Bot";
  *   - description: string (required)
  *   - recommendedCapital: number (required)
  *   - performanceDuration: string (optional, default: "1M")
- *   - currency: string (optional, default: "USD")
+ *   - script: string (optional, default: "USD")
  */
 export async function addBotFieldsMigration() {
   try {
@@ -31,19 +31,19 @@ export async function addBotFieldsMigration() {
         "A fully automated trading bot that uses advanced AI to analyze markets, predict opportunities, and execute trades in real-time. It works 24/7 to maximize profits and reduce risks — all without human intervention.";
       updateData.recommendedCapital = bot.recommendedCapital || 1000;
       updateData.performanceDuration = bot.performanceDuration || "1M";
-      updateData.currency = bot.currency || "USD";
+      updateData.script = (bot as any).script || "USD";
 
       console.log(`Updating bot ${bot.name} with fields:`, [
         "description",
         "recommendedCapital",
         "performanceDuration",
-        "currency",
+        "script",
       ]);
       console.log(`Current values:`, {
         description: updateData.description,
         recommendedCapital: updateData.recommendedCapital,
         performanceDuration: updateData.performanceDuration,
-        currency: updateData.currency,
+        script: updateData.script,
       });
       console.log(`Removing html field from bot ${bot.name}`);
 
@@ -68,7 +68,7 @@ export async function addBotFieldsMigration() {
             description: updateData.description,
             recommendedCapital: updateData.recommendedCapital,
             performanceDuration: updateData.performanceDuration,
-            currency: updateData.currency,
+            script: updateData.script,
           },
         },
         { new: true, runValidators: false }
@@ -111,7 +111,7 @@ export async function rollbackBotFieldsMigration() {
             description: 1,
             recommendedCapital: 1,
             performanceDuration: 1,
-            currency: 1,
+            script: 1,
           },
           $set: {
             html: "<div>Bot interface HTML</div>",

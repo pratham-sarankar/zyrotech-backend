@@ -112,16 +112,34 @@ router.get("/", async (req, res, next) => {
     }
 
     const subscriptions = await BotSubscription.find(query)
+      .populate(
+        "botId",
+        "name description recommendedCapital performanceDuration script"
+      )
       .select("-__v")
       .sort({ subscribedAt: -1 });
 
     // Transform response
     const transformedSubscriptions = subscriptions.map((subscription) => {
+      const subscriptionObj = subscription.toObject();
       const transformedSubscription: any = {
-        ...subscription.toObject(),
-        id: subscription._id,
+        ...subscriptionObj,
+        id: subscriptionObj._id,
+        bot: (subscriptionObj.botId as any)?._id
+          ? {
+              id: (subscriptionObj.botId as any)._id,
+              name: (subscriptionObj.botId as any).name,
+              description: (subscriptionObj.botId as any).description,
+              recommendedCapital: (subscriptionObj.botId as any)
+                .recommendedCapital,
+              performanceDuration: (subscriptionObj.botId as any)
+                .performanceDuration,
+              script: (subscriptionObj.botId as any).script,
+            }
+          : null,
       };
       delete transformedSubscription._id;
+      delete transformedSubscription.botId;
       return transformedSubscription;
     });
 
@@ -146,7 +164,12 @@ router.get("/:id", async (req, res, next) => {
     const subscription = await BotSubscription.findOne({
       _id: id,
       userId: req.user._id,
-    }).select("-__v");
+    })
+      .populate(
+        "botId",
+        "name description recommendedCapital performanceDuration script"
+      )
+      .select("-__v");
 
     if (!subscription) {
       throw new AppError(
@@ -157,11 +180,25 @@ router.get("/:id", async (req, res, next) => {
     }
 
     // Transform response
+    const subscriptionObj = subscription.toObject();
     const transformedSubscription: any = {
-      ...subscription.toObject(),
-      id: subscription._id,
+      ...subscriptionObj,
+      id: subscriptionObj._id,
+      bot: (subscriptionObj.botId as any)?._id
+        ? {
+            id: (subscriptionObj.botId as any)._id,
+            name: (subscriptionObj.botId as any).name,
+            description: (subscriptionObj.botId as any).description,
+            recommendedCapital: (subscriptionObj.botId as any)
+              .recommendedCapital,
+            performanceDuration: (subscriptionObj.botId as any)
+              .performanceDuration,
+            script: (subscriptionObj.botId as any).script,
+          }
+        : null,
     };
     delete transformedSubscription._id;
+    delete transformedSubscription.botId;
 
     res.status(200).json({
       status: "success",

@@ -2,6 +2,7 @@ import express from "express";
 import { auth } from "../middleware/auth";
 import { AppError } from "../middleware/errorHandler";
 import Bot from "../models/Bot";
+import Group from "../models/Group";
 
 const router = express.Router();
 
@@ -21,15 +22,23 @@ router.post("/", async (req, res, next) => {
       recommendedCapital,
       performanceDuration,
       currency,
+      script,
+      groupId,
     } = req.body;
 
     // Validate required fields
-    if (!name || !description || recommendedCapital === undefined) {
+    if (!name || !description || recommendedCapital === undefined || !groupId) {
       throw new AppError(
-        "Please provide name, description, and recommendedCapital",
+        "Please provide name, description, recommendedCapital, and groupId",
         400,
         "missing-required-fields"
       );
+    }
+
+    // Check if group exists
+    const group = await Group.findById(groupId);
+    if (!group) {
+      throw new AppError("Group not found", 404, "group-not-found");
     }
 
     // Check if bot with same name already exists
@@ -49,6 +58,8 @@ router.post("/", async (req, res, next) => {
       recommendedCapital,
       performanceDuration,
       currency,
+      script,
+      groupId,
     });
 
     // Transform response to remove __v and convert _id to id
@@ -74,17 +85,32 @@ router.post("/", async (req, res, next) => {
  * @desc Get all bots
  * @access Private
  */
-router.get("/", async (_req, res, next) => {
+router.get("/", async (req, res, next) => {
   try {
-    const bots = await Bot.find().select("-__v");
+    const { groupId } = req.query;
+
+    // Build query based on groupId parameter
+    const query = groupId ? { groupId } : {};
+
+    const bots = await Bot.find(query)
+      .populate("groupId", "name")
+      .select("-__v");
 
     // Transform response to convert _id to id
     const transformedBots = bots.map((bot) => {
-      const transformedBot = {
-        ...bot.toObject(),
-        id: bot._id,
+      const botObj = bot.toObject();
+      const transformedBot: any = {
+        ...botObj,
+        id: botObj._id,
+        group: (botObj.groupId as any)?._id
+          ? {
+              id: (botObj.groupId as any)._id,
+              name: (botObj.groupId as any).name,
+            }
+          : null,
       };
       delete transformedBot._id;
+      delete transformedBot.groupId;
       return transformedBot;
     });
 
@@ -106,18 +132,28 @@ router.get("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const bot = await Bot.findById(id).select("-__v");
+    const bot = await Bot.findById(id)
+      .populate("groupId", "name")
+      .select("-__v");
 
     if (!bot) {
       throw new AppError("Bot not found", 404, "bot-not-found");
     }
 
     // Transform response to convert _id to id
-    const transformedBot = {
-      ...bot.toObject(),
-      id: bot._id,
+    const botObj = bot.toObject();
+    const transformedBot: any = {
+      ...botObj,
+      id: botObj._id,
+      group: (botObj.groupId as any)?._id
+        ? {
+            id: (botObj.groupId as any)._id,
+            name: (botObj.groupId as any).name,
+          }
+        : null,
     };
     delete transformedBot._id;
+    delete transformedBot.groupId;
 
     res.status(200).json({
       status: "success",
@@ -196,6 +232,8 @@ router.put("/:id", async (req, res, next) => {
       recommendedCapital,
       performanceDuration,
       currency,
+      script,
+      groupId,
     } = req.body;
 
     // Validate at least one field is provided
@@ -204,7 +242,9 @@ router.put("/:id", async (req, res, next) => {
       !description &&
       recommendedCapital === undefined &&
       !performanceDuration &&
-      !currency
+      !currency &&
+      !script &&
+      !groupId
     ) {
       throw new AppError(
         "Please provide at least one field to update",
@@ -217,6 +257,14 @@ router.put("/:id", async (req, res, next) => {
     const existingBot = await Bot.findById(id);
     if (!existingBot) {
       throw new AppError("Bot not found", 404, "bot-not-found");
+    }
+
+    // Check if groupId is being updated and if the group exists
+    if (groupId && groupId !== existingBot.groupId.toString()) {
+      const group = await Group.findById(groupId);
+      if (!group) {
+        throw new AppError("Group not found", 404, "group-not-found");
+      }
     }
 
     // Check if name is being updated and if it conflicts with another bot
@@ -240,7 +288,8 @@ router.put("/:id", async (req, res, next) => {
     if (performanceDuration)
       updateData.performanceDuration = performanceDuration;
     if (currency !== undefined) updateData.currency = currency;
-
+    if (script !== undefined) updateData.script = script;
+    if (groupId) updateData.groupId = groupId;
     // Update bot
     const bot = await Bot.findByIdAndUpdate(
       id,
