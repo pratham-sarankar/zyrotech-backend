@@ -378,4 +378,72 @@ router.get("/subscribed", async (req, res, next) => {
   }
 });
 
+/**
+ * @route GET /api/bots/:id/performance-overview
+ * @desc Get performance overview for a specific bot
+ * @access Private
+ */
+router.get("/:id/performance-overview", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Check if bot exists
+    const bot = await Bot.findById(id);
+    if (!bot) {
+      throw new AppError("Bot not found", 404, "bot-not-found");
+    }
+
+    // Get all signals for this bot
+    const Signal = require("../models/Signal").default;
+    const signals = await Signal.find({ botId: id });
+
+    // Filter completed signals (those with exitTime and profitLoss)
+    const completedSignals = signals.filter(
+      (signal: any) => signal.exitTime && signal.profitLoss !== undefined
+    );
+
+    const totalReturn = completedSignals.reduce(
+      (sum: number, signal: any) => sum + (signal.profitLoss || 0),
+      0
+    );
+
+    // Calculate win rate
+    const winningSignals = completedSignals.filter(
+      (signal: any) => (signal.profitLoss || 0) > 0
+    );
+    const winRate =
+      completedSignals.length > 0
+        ? (winningSignals.length / completedSignals.length) * 100
+        : 0;
+
+    // Calculate profit factor
+    const totalWins = winningSignals.reduce(
+      (sum: number, signal: any) => sum + (signal.profitLoss || 0),
+      0
+    );
+    const losingSignals = completedSignals.filter(
+      (signal: any) => (signal.profitLoss || 0) < 0
+    );
+    const totalLosses = Math.abs(
+      losingSignals.reduce(
+        (sum: number, signal: any) => sum + (signal.profitLoss || 0),
+        0
+      )
+    );
+    const profitFactor = totalLosses > 0 ? totalWins / totalLosses : 0;
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        totalTrades: completedSignals.length,
+        totalReturn: Math.round(totalReturn * 100) / 100, // Round to 2 decimal places
+        winRate: Math.round(winRate * 100) / 100, // Round to 2 decimal places
+        profitFactor: Math.round(profitFactor * 100) / 100, // Round to 2 decimal places
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

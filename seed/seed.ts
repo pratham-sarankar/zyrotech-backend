@@ -1,9 +1,12 @@
 import "dotenv/config";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
+import fs from "fs";
+import path from "path";
 import User from "../src/models/User";
 import Group from "../src/models/Group";
 import Bot from "../src/models/Bot";
+import Signal from "../src/models/Signal";
 
 async function seed() {
   try {
@@ -198,16 +201,74 @@ async function seed() {
         groupName: "Crypto",
       },
     ];
+
+    const seededBots: any[] = [];
     for (const bot of bots) {
       const group = await Group.findOne({ name: bot.groupName });
       if (!group) throw new Error(`Group not found for bot: ${bot.name}`);
-      await Bot.findOneAndUpdate(
+      const seededBot = await Bot.findOneAndUpdate(
         { _id: bot._id },
         { ...bot, groupId: group._id },
-        { upsert: true, setDefaultsOnInsert: true }
+        { upsert: true, setDefaultsOnInsert: true, new: true }
       );
+      seededBots.push(seededBot);
     }
     console.log("Seeded bots");
+
+    // 4. Seed signals for all bots
+    const signalsPath = path.join(__dirname, "data", "signals.json");
+    const signalsData = JSON.parse(fs.readFileSync(signalsPath, "utf8"));
+
+    console.log(`Loading ${signalsData.length} signals from signals.json`);
+
+    for (const bot of seededBots) {
+      console.log(`Seeding signals for bot: ${bot.name} (${bot._id})`);
+
+      for (const signal of signalsData) {
+        // Create unique tradeId for each bot by appending bot name
+        const uniqueTradeId = `${signal.tradeId}_${bot.name.replace(
+          /[^a-zA-Z0-9]/g,
+          ""
+        )}`;
+
+        const signalData = {
+          botId: bot._id,
+          tradeId: uniqueTradeId,
+          direction: signal.direction,
+          signalTime: new Date(signal.signalTime),
+          entryTime: new Date(signal.entryTime),
+          entryPrice: signal.entryPrice,
+          stoploss: signal.stoploss,
+          target1r: signal.target1r,
+          target2r: signal.target2r,
+          exitTime: signal.exitTime ? new Date(signal.exitTime) : undefined,
+          exitPrice: signal.exitPrice,
+          exitReason: signal.exitReason,
+          profitLoss: signal.profitLoss,
+          profitLossR: signal.profitLossR,
+          trailCount: signal.trailCount,
+          createdAt: new Date(signal.createdAt),
+          updatedAt: new Date(signal.updatedAt),
+        };
+
+        try {
+          await Signal.findOneAndUpdate(
+            { botId: bot._id, tradeId: uniqueTradeId },
+            signalData,
+            { upsert: true, setDefaultsOnInsert: true }
+          );
+        } catch (error) {
+          console.warn(
+            `Failed to seed signal ${uniqueTradeId} for bot ${bot.name}:`,
+            error
+          );
+        }
+      }
+
+      console.log(`Completed seeding signals for bot: ${bot.name}`);
+    }
+
+    console.log("Seeded signals for all bots");
 
     await mongoose.disconnect();
     console.log("Disconnected from MongoDB");
