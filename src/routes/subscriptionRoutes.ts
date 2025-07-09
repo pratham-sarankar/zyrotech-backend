@@ -104,10 +104,7 @@ router.get("/", async (req, res, next) => {
 
     // Build query
     const query: any = { userId: req.user._id };
-    if (
-      status &&
-      ["active", "inactive", "cancelled"].includes(status as string)
-    ) {
+    if (status && ["active", "cancelled"].includes(status as string)) {
       query.status = status;
     }
 
