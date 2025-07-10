@@ -6,7 +6,7 @@ import mongoose, { Document } from "mongoose";
 export interface IBotSubscription extends Document {
   userId: mongoose.Types.ObjectId;
   botId: mongoose.Types.ObjectId;
-  status: "active" | "inactive" | "cancelled";
+  status: "active" | "cancelled";
   subscribedAt: Date;
   cancelledAt?: Date;
   createdAt: Date;
@@ -30,7 +30,7 @@ const botSubscriptionSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["active", "inactive", "cancelled"],
+      enum: ["active", "cancelled"],
       default: "active",
     },
     subscribedAt: {

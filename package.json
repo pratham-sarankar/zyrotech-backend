@@ -8,7 +8,8 @@
     "dev": "nodemon src/app.ts",
     "build": "tsc && cp -r src/views dist/",
     "migrate": "node scripts/migrate.js",
-    "migrate:rollback": "node scripts/migrate.js rollback"
+    "migrate:rollback": "node scripts/migrate.js rollback",
+    "seed": "ts-node seed/seed.ts"
   },
   "keywords": [],
   "author": "",

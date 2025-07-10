@@ -8,7 +8,8 @@ export interface IBot extends Document {
   description: string;
   recommendedCapital: number;
   performanceDuration?: string;
-  currency?: string;
+  script?: string;
+  groupId: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -45,11 +46,16 @@ const botSchema = new mongoose.Schema(
       },
       default: "1M",
     },
-    currency: {
+    script: {
       type: String,
       trim: true,
-      maxlength: [10, "Currency code cannot exceed 10 characters"],
+      maxlength: [10, "Script code cannot exceed 10 characters"],
       default: "USD",
+    },
+    groupId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Group",
+      required: [true, "Group ID is required"],
     },
   },
   {
